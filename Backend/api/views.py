@@ -10,13 +10,21 @@ from django.views.decorators.csrf import csrf_exempt
 from pymongo import MongoClient
 import json
 
-# --- Replace with your keys ---
+# -------------------------------------------------- Utilities -------------------------------------------------
+# Set up OpenAI and Reddit API clients
 openai.api_key = "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"
 reddit = praw.Reddit(
     client_id="YOUR_REDDIT_ID",
     client_secret="YOUR_REDDIT_SECRET",
     user_agent="festifly-agent"
 )
+
+# Connect to MongoDB
+client = MongoClient('mongodb+srv://ihub:akash@ihub.fel24ru.mongodb.net/')
+db = client['festifly']
+festival_collection = db['festivals']
+
+
 
 @api_view(['POST'])
 def festival_vibe(request):
