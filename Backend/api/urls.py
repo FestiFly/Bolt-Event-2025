@@ -8,8 +8,6 @@ urlpatterns = [
     path('organizer/create/', organizer_create, name='organizer_create'),
     path('festival/details/', festival_details, name='festival_details'),   
 
-
-
     #organizer urls
     path('organizer/signup/', organizer_signup, name='organizer-signup'), 
     path('organizer/login/', organizer_login, name='organizer-login'),

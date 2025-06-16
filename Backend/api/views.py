@@ -9,6 +9,7 @@ import re
 from django.views.decorators.csrf import csrf_exempt
 from pymongo import MongoClient
 import json
+import copy
 
 # -------------------------------------------------- Utilities -------------------------------------------------
 # Set up OpenAI and Reddit API clients
@@ -109,24 +110,24 @@ festival_collection = db['festivals']
 def get_recommendations(request):
     if request.method == "POST":
         try:
-            # Parse request body
             data = json.loads(request.body)
             location = data.get("location")
             interests = data.get("interests", [])
             month = data.get("month")
 
-            # Validate required fields
             if not location or not month:
                 return JsonResponse({"error": "Both 'location' and 'month' are required."}, status=400)
 
-            # Fetch festivals from Reddit
             fetched_festivals = fetch_reddit_festivals(location, interests, month)
 
-            # Insert into MongoDB (does add _id, but we won't return it)
             if fetched_festivals:
-                festival_collection.insert_many(fetched_festivals)
+                # Insert into MongoDB (mutates the list)
+                festival_collection.insert_many(copy.deepcopy(fetched_festivals))
 
-            # Return the original (ObjectId-free) data
+            # Remove ObjectIds if added
+            for f in fetched_festivals:
+                f.pop('_id', None)
+
             return JsonResponse({"festivals": fetched_festivals}, status=200)
 
         except Exception as e:
