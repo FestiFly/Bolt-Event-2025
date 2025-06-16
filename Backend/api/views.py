@@ -3,6 +3,12 @@ from rest_framework.decorators import api_view
 import openai, praw, requests
 from textblob import TextBlob
 import os
+import requests
+from datetime import datetime
+import re
+from django.views.decorators.csrf import csrf_exempt
+from pymongo import MongoClient
+import json
 
 # --- Replace with your keys ---
 openai.api_key = "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"
@@ -11,19 +17,6 @@ reddit = praw.Reddit(
     client_secret="YOUR_REDDIT_SECRET",
     user_agent="festifly-agent"
 )
-
-@api_view(['POST'])
-def recommend_festivals(request):
-    data = request.data
-    prompt = f"What are the best cultural festivals near {data['location']} in {data['month']}?"
-    
-    completion = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    
-    response = completion.choices[0].message.content
-    return JsonResponse({"recommendations": response})
 
 @api_view(['POST'])
 def festival_vibe(request):
@@ -51,16 +44,6 @@ def festival_details(request):
         "calendar_link": "https://calendar.google.com",
         "suggested_hotels": ["Hotel A", "Hotel B"]
     })
-
-
-
-
-import requests
-from datetime import datetime
-import re
-from django.views.decorators.csrf import csrf_exempt
-from pymongo import MongoClient
-import json
 
 # You can expand this to include more subreddits
 RELEVANT_SUBREDDITS = ["Festivals", "IndiaTravel", "travel", "backpacking", "festival_culture"]
@@ -108,8 +91,6 @@ def fetch_reddit_festivals(location, interests, month):
                     })
 
     return results
-
-
 
 # Connect to MongoDB
 client = MongoClient('mongodb+srv://ihub:akash@ihub.fel24ru.mongodb.net/')
