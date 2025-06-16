@@ -10,41 +10,20 @@ from django.views.decorators.csrf import csrf_exempt
 from pymongo import MongoClient
 import json
 import copy
+from pymongo.errors import PyMongoError# Assume we cleanly separate it
+
+# MongoDB setup
+client = MongoClient('mongodb+srv://ihub:akash@ihub.fel24ru.mongodb.net/')
+db = client['festifly']
+festival_collection = db['festivals']
 
 # --- Replace with your keys ---
 openai.api_key = "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"
 reddit = praw.Reddit(
-    client_id="YOUR_REDDIT_ID",
-    client_secret="YOUR_REDDIT_SECRET",
+    client_id="3VH_mh989qrCYqfsirU959A",
+    client_secret="fjqtjosj1j9b5spWZ8YgUQ8N5NNbJw",
     user_agent="festifly-agent"
 )
-
-@api_view(['POST'])
-def festival_vibe(request):
-    subreddit = request.data.get("subreddit")
-    comments = []
-    for submission in reddit.subreddit(subreddit).hot(limit=5):
-        submission.comments.replace_more(limit=0)
-        for comment in submission.comments[:10]:
-            comments.append(comment.body)
-    
-    vibe_score = sum(TextBlob(c).sentiment.polarity for c in comments) / len(comments)
-    return JsonResponse({"vibe": vibe_score})
-
-@api_view(['POST'])
-def organizer_create(request):
-    data = request.data
-    # Here you can save to a DB or just echo back
-    return JsonResponse({"status": "success", "data": data})
-
-@api_view(['GET'])
-def festival_details(request):
-    # Dummy map or logistics logic
-    return JsonResponse({
-        "map_link": "https://maps.google.com/?q=location",
-        "calendar_link": "https://calendar.google.com",
-        "suggested_hotels": ["Hotel A", "Hotel B"]
-    })
 
 # You can expand this to include more subreddits
 RELEVANT_SUBREDDITS = ["Festivals", "IndiaTravel", "travel", "backpacking", "festival_culture"]
@@ -52,8 +31,23 @@ RELEVANT_SUBREDDITS = ["Festivals", "IndiaTravel", "travel", "backpacking", "fes
 # You can use your Reddit API credentials here
 HEADERS = {"User-Agent": "FestiflyBot/0.1"}
 
+def get_post_vibe(permalink):
+    try:
+        post_id = permalink.split("/comments/")[1].split("/")[0]
+        submission = reddit.submission(id=post_id)
+        submission.comments.replace_more(limit=0)
+        comments = [comment.body for comment in submission.comments[:10]]
+        if not comments:
+            return None
+        scores = [TextBlob(comment).sentiment.polarity for comment in comments]
+        return round(sum(scores) / len(scores), 2)
+    except Exception as e:
+        print(f"Error calculating vibe for {permalink}: {e}")
+        return None
+
 def fetch_reddit_festivals(location, interests, month):
     search_query = f"{location} {month} {' '.join(interests)} festival"
+    seen_links = set()
     results = []
 
     for subreddit in RELEVANT_SUBREDDITS:
@@ -73,57 +67,84 @@ def fetch_reddit_festivals(location, interests, month):
 
             for post in posts:
                 data = post.get("data", {})
-
-                # Defensive check
                 title = data.get("title")
                 permalink = data.get("permalink")
                 score = data.get("score", 0)
 
                 if title and permalink:
+                    full_url = f"https://reddit.com{permalink}"
+
+                    # Deduplicate based on URL
+                    if full_url in seen_links:
+                        continue
+                    seen_links.add(full_url)
+
+                    # Real-time sentiment
+                    vibe = get_post_vibe(permalink)
+
                     results.append({
                         "title": title,
                         "location": location,
                         "tags": interests,
-                        "reddit_url": f"https://reddit.com{permalink}",
+                        "reddit_url": full_url,
                         "upvotes": score,
                         "month": month,
-                        "vibe_score": None,
+                        "vibe_score": vibe,
                         "fetched_at": datetime.utcnow()
                     })
 
     return results
 
-# Connect to MongoDB
-client = MongoClient('mongodb+srv://ihub:akash@ihub.fel24ru.mongodb.net/')
-db = client['festifly']
-festival_collection = db['festivals']
-
 @csrf_exempt
 def get_recommendations(request):
-    if request.method == "POST":
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST method is allowed."}, status=405)
+
+    try:
+        # 1. Parse request body
         try:
             data = json.loads(request.body)
-            location = data.get("location")
-            interests = data.get("interests", [])
-            month = data.get("month")
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON body."}, status=400)
 
-            if not location or not month:
-                return JsonResponse({"error": "Both 'location' and 'month' are required."}, status=400)
+        location = data.get("location", "").strip()
+        interests = data.get("interests", [])
+        month = data.get("month", "").strip()
 
-            fetched_festivals = fetch_reddit_festivals(location, interests, month)
+        # 2. Validate required fields (User Story 1)
+        if not location or not month:
+            return JsonResponse({
+                "error": "Both 'location' and 'month' are required fields."
+            }, status=400)
 
-            if fetched_festivals:
-                # Insert into MongoDB (mutates the list)
-                festival_collection.insert_many(copy.deepcopy(fetched_festivals))
+        # 3. Log search intent (for future analytics)
+        print(f"[{datetime.utcnow()}] Searching: location={location}, month={month}, interests={interests}")
 
-            # Remove ObjectIds if added
-            for f in fetched_festivals:
-                f.pop('_id', None)
+        # 4. Fetch from Reddit (User Story 3 - natural language relevance)
+        festivals = fetch_reddit_festivals(location, interests, month)
 
-            return JsonResponse({"festivals": fetched_festivals}, status=200)
+        if not festivals:
+            return JsonResponse({
+                "message": "No festivals found for the given filters.",
+                "festivals": []
+            }, status=200)
 
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
+        # 5. Save into Mongo (but don’t mutate return list with ObjectId)
+        try:
+            festival_collection.insert_many(copy.deepcopy(festivals))
+        except PyMongoError as e:
+            print(f"MongoDB error: {str(e)}")  # Log but don't crash
 
-    return JsonResponse({"error": "Only POST method is allowed."}, status=405)
+        # 6. Clean _id before returning (User Story 2 - clean cards)
+        for fest in festivals:
+            fest.pop('_id', None)
+
+        # 7. Sort by vibe_score and upvotes for better relevance
+        festivals.sort(key=lambda x: (x.get("vibe_score") or 0, x.get("upvotes", 0)), reverse=True)
+
+        # 8. Return final response
+        return JsonResponse({"festivals": festivals}, status=200)
+
+    except Exception as e:
+        return JsonResponse({"error": f"Server error: {str(e)}"}, status=500)
 
