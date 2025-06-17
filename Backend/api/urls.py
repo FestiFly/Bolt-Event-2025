@@ -8,6 +8,8 @@ urlpatterns = [
     path('ai-travel-suggestions/', ai_travel_suggestions, name='ai_travel_suggestions'),   
     path('get-all-festivals/', get_all_festivals, name='get_all_festivals'), 
     path("fetch-reddit-reviews/", fetch_reddit_reviews_by_id, name="fetch_reddit_reviews"),
+    path("generate-voice-briefing/", generate_voice_briefing, name="generate_voice_briefing"),
+
 
     #organizer urls
     path('organizer/signup/', organizer_signup, name='organizer-signup'), 

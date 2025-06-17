@@ -373,3 +373,119 @@ def get_all_festivals(request):
         return JsonResponse({"error": f"MongoDB error: {str(e)}"}, status=500)
     except Exception as e:
         return JsonResponse({"error": f"Server error: {str(e)}"}, status=500)
+    
+#===============================================================Voice Assistant===========================================================@csrf_exempt
+@csrf_exempt
+@api_view(["POST"])
+def generate_voice_briefing(request):
+    try:
+        data = json.loads(request.body)
+        festival_id = data.get("_id")
+        language = data.get("language", "en").lower()
+
+        if not festival_id:
+            return JsonResponse({"error": "_id is required"}, status=400)
+
+        # Fetch festival
+        fest = festival_collection.find_one({"_id": ObjectId(festival_id)})
+        if not fest:
+            return JsonResponse({"error": "Festival not found"}, status=404)
+
+        # ✅ Return early if already generated
+        cached_audio = fest.get(f"ai_voice_url_{language}")
+        cached_script = fest.get(f"ai_voice_script_{language}")
+        if cached_audio and cached_script:
+            return JsonResponse({
+                "script": cached_script,
+                "audio_url": cached_audio
+            })
+
+        # Voice mapping based on language
+        VOICE_MAP_BY_LANG = {
+            "en": "EXAVITQu4vr4xnSDxMaL",             # English Mamme
+            "ta": "gCr8TeSJgJaeaIoV4RWH",              # Tamil Akka
+            "hi": "1qEiC6qsybMkmnNdVMbK",              # Vadaku Doli
+        }
+        voice_id = VOICE_MAP_BY_LANG.get(language, VOICE_MAP_BY_LANG["en"])
+
+        # Compose AI prompt
+        reviews = fest.get("reddit_review", [])[:3]
+        review_summary = "\n".join(f"- {r['comment']}" for r in reviews)
+
+        prompt = f"""
+        You're an AI assistant. Write a 30-second voice briefing about this festival.
+
+        Title: {fest['title']}
+        Location: {fest['location']}
+        Month: {fest['month']}
+        Vibe Score: {fest.get('vibe_score', 'N/A')}
+        Description: {fest.get('content', '')}
+        Reviews:
+        {review_summary}
+
+        Keep it natural, spoken, and friendly.
+        """
+
+        # Gemini to generate script
+        response = model.generate_content(prompt)
+        script_en = response.text.strip()
+
+        # Translate if non-English
+        final_script = script_en
+        if language != "en":
+            translate_url = "https://translate.googleapis.com/translate_a/single"
+            params = {
+                "client": "gtx",
+                "sl": "en",
+                "tl": language,
+                "dt": "t",
+                "q": script_en,
+            }
+            res = requests.get(translate_url, params=params)
+            translated = res.json()[0]
+            final_script = "".join([line[0] for line in translated])
+
+        # ElevenLabs TTS
+        eleven_api_key = "sk_ef9305110b34246545463b96bea287d63816fd6c78398d6d"
+        tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+
+        headers = {
+            "xi-api-key": eleven_api_key,
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "text": final_script,
+            "voice_settings": {
+                "stability": 0.5,
+                "similarity_boost": 0.7
+            }
+        }
+
+        res = requests.post(tts_url, headers=headers, json=payload)
+        if res.status_code != 200:
+            return JsonResponse({"error": "Voice generation failed", "details": res.text}, status=500)
+
+        # Save voice file
+        filename = f"{festival_id}_{language}.mp3"
+        audio_path = f"static/voices/{filename}"
+        os.makedirs("static/voices", exist_ok=True)
+        with open(audio_path, "wb") as f:
+            f.write(res.content)
+
+        # Cache in MongoDB
+        festival_collection.update_one(
+            {"_id": ObjectId(festival_id)},
+            {"$set": {
+                f"ai_voice_script_{language}": final_script,
+                f"ai_voice_url_{language}": f"/static/voices/{filename}"
+            }}
+        )
+
+        return JsonResponse({
+            "script": final_script,
+            "audio_url": f"/static/voices/{filename}"
+        })
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
