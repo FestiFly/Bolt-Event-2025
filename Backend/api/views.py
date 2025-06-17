@@ -17,13 +17,19 @@ client = MongoClient('mongodb+srv://ihub:akash@ihub.fel24ru.mongodb.net/')
 db = client['festifly']
 festival_collection = db['festivals']
 
-# --- Replace with your keys ---
+# -------------------------------------------------- Utilities -------------------------------------------------
+# Set up OpenAI and Reddit API clients
 openai.api_key = "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"
 reddit = praw.Reddit(
     client_id="3VH_mH98qrCYqfsi7U959A",
     client_secret="fjqtjosj1j9b5spWZ8YgUQ8N5NNbJw",
     user_agent="festifly-agent"
 )
+
+# Connect to MongoDB
+client = MongoClient('mongodb+srv://ihub:akash@ihub.fel24ru.mongodb.net/')
+db = client['festifly']
+festival_collection = db['festivals']
 
 # You can expand this to include more subreddits
 RELEVANT_SUBREDDITS = ["Festivals", "IndiaTravel", "travel", "backpacking", "festival_culture"]
