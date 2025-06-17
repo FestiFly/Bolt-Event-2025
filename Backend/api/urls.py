@@ -4,6 +4,7 @@ from .organizer import *
 
 urlpatterns = [
     path('recommendations/', get_recommendations, name='get_recommendations'),
+    path("festival/", get_festival_by_id, name="get_festival_by_id"),
     path('ai-travel-suggestions/', ai_travel_suggestions, name='ai_travel_suggestions'),  
 
     #organizer urls

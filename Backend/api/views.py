@@ -12,7 +12,7 @@ import json
 import copy
 from pymongo.errors import PyMongoError
 import google.generativeai as genai
-
+from bson.objectid import ObjectId
 
 # MongoDB setup
 client = MongoClient('mongodb+srv://ihub:akash@ihub.fel24ru.mongodb.net/')
@@ -27,6 +27,10 @@ reddit = praw.Reddit(
     client_secret="fjqtjosj1j9b5spWZ8YgUQ8N5NNbJw",
     user_agent="festifly-agent"
 )
+
+# Gemini setup
+genai.configure(api_key="AIzaSyC5iWXg1sKwZsbh-YpgA58CP8Ulg4q4Y5I")
+model = genai.GenerativeModel("gemini-2.0-flash")
 
 # Connect to MongoDB
 client = MongoClient('mongodb+srv://ihub:akash@ihub.fel24ru.mongodb.net/')
@@ -175,10 +179,26 @@ def get_recommendations(request):
     except Exception as e:
         return JsonResponse({"error": f"Server error: {str(e)}"}, status=500)
 
-# Gemini setup
-genai.configure(api_key="AIzaSyC5iWXg1sKwZsbh-YpgA58CP8Ulg4q4Y5I")
-model = genai.GenerativeModel("gemini-2.0-flash")
+@csrf_exempt
+@api_view(["POST"])
+def get_festival_by_id(request):
+    try:
+        body = json.loads(request.body)
+        festival_id = body.get("_id")
 
+        if not festival_id:
+            return JsonResponse({"error": "_id is required"}, status=400)
+
+        festival = festival_collection.find_one({"_id": ObjectId(festival_id)})
+        if not festival:
+            return JsonResponse({"error": "Festival not found"}, status=404)
+
+        festival["_id"] = str(festival["_id"])  # Convert ObjectId to string for frontend
+        return JsonResponse({"festival": festival}, status=200)
+
+    except Exception as e:
+        return JsonResponse({"error": f"Server error: {str(e)}"}, status=500)
+    
 @csrf_exempt
 def ai_travel_suggestions(request):
     if request.method == "POST":
