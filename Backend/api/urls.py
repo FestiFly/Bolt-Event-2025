@@ -3,7 +3,8 @@ from .views import *
 from .organizer import *
 
 urlpatterns = [
-    path('recommendations/', get_recommendations, name='get_recommendations'),  
+    path('recommendations/', get_recommendations, name='get_recommendations'),
+    path('ai-travel-suggestions/', ai_travel_suggestions, name='ai_travel_suggestions'),  
 
     #organizer urls
     path('organizer/signup/', organizer_signup, name='organizer-signup'), 
