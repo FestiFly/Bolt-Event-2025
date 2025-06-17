@@ -80,13 +80,22 @@ def fetch_reddit_festivals(location, interests, month):
                 if title and permalink:
                     full_url = f"https://reddit.com{permalink}"
 
-                    # Deduplicate based on URL
+                    # Skip if already added
                     if full_url in seen_links:
                         continue
                     seen_links.add(full_url)
 
-                    # Real-time sentiment
+                    # Get vibe score
                     vibe = get_post_vibe(permalink)
+
+                    # Get post body content (summary)
+                    try:
+                        post_id = permalink.split("/comments/")[1].split("/")[0]
+                        submission = reddit.submission(id=post_id)
+                        content = submission.selftext[:500] if submission.selftext else None
+                    except Exception as e:
+                        print(f"Error fetching content for {permalink}: {e}")
+                        content = None
 
                     results.append({
                         "title": title,
@@ -96,6 +105,7 @@ def fetch_reddit_festivals(location, interests, month):
                         "upvotes": score,
                         "month": month,
                         "vibe_score": vibe,
+                        "content": content,
                         "fetched_at": datetime.utcnow()
                     })
 
@@ -107,7 +117,6 @@ def get_recommendations(request):
         return JsonResponse({"error": "Only POST method is allowed."}, status=405)
 
     try:
-        # 1. Parse request body
         try:
             data = json.loads(request.body)
         except json.JSONDecodeError:
@@ -117,16 +126,13 @@ def get_recommendations(request):
         interests = data.get("interests", [])
         month = data.get("month", "").strip()
 
-        # 2. Validate required fields (User Story 1)
         if not location or not month:
             return JsonResponse({
                 "error": "Both 'location' and 'month' are required fields."
             }, status=400)
 
-        # 3. Log search intent (for future analytics)
         print(f"[{datetime.utcnow()}] Searching: location={location}, month={month}, interests={interests}")
 
-        # 4. Fetch from Reddit (User Story 3 - natural language relevance)
         festivals = fetch_reddit_festivals(location, interests, month)
 
         if not festivals:
@@ -135,22 +141,34 @@ def get_recommendations(request):
                 "festivals": []
             }, status=200)
 
-        # 5. Save into Mongo (but don’t mutate return list with ObjectId)
         try:
-            festival_collection.insert_many(copy.deepcopy(festivals))
+            insert_result = festival_collection.insert_many(copy.deepcopy(festivals))
+            for i, fest in enumerate(festivals):
+                fest["_id"] = str(insert_result.inserted_ids[i])
         except PyMongoError as e:
-            print(f"MongoDB error: {str(e)}")  # Log but don't crash
+            print(f"MongoDB error: {str(e)}")
 
-        # 6. Clean _id before returning (User Story 2 - clean cards)
-        for fest in festivals:
-            fest.pop('_id', None)
-
-        # 7. Sort by vibe_score and upvotes for better relevance
+        # Sort by vibe and upvotes
         festivals.sort(key=lambda x: (x.get("vibe_score") or 0, x.get("upvotes", 0)), reverse=True)
 
-        # 8. Return final response
+        # Reorder keys: _id on top
+        for i in range(len(festivals)):
+            fest = festivals[i]
+            reordered = {
+                "_id": fest.get("_id"),
+                "title": fest.get("title"),
+                "location": fest.get("location"),
+                "tags": fest.get("tags"),
+                "content": fest.get("content"),
+                "reddit_url": fest.get("reddit_url"),
+                "upvotes": fest.get("upvotes"),
+                "month": fest.get("month"),
+                "vibe_score": fest.get("vibe_score"),
+                "fetched_at": fest.get("fetched_at")
+            }
+            festivals[i] = reordered
+
         return JsonResponse({"festivals": festivals}, status=200)
 
     except Exception as e:
         return JsonResponse({"error": f"Server error: {str(e)}"}, status=500)
-
