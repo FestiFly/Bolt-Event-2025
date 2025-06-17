@@ -10,7 +10,9 @@ from django.views.decorators.csrf import csrf_exempt
 from pymongo import MongoClient
 import json
 import copy
-from pymongo.errors import PyMongoError# Assume we cleanly separate it
+from pymongo.errors import PyMongoError
+import google.generativeai as genai
+
 
 # MongoDB setup
 client = MongoClient('mongodb+srv://ihub:akash@ihub.fel24ru.mongodb.net/')
@@ -154,3 +156,77 @@ def get_recommendations(request):
     except Exception as e:
         return JsonResponse({"error": f"Server error: {str(e)}"}, status=500)
 
+
+# Gemini setup
+genai.configure(api_key="AIzaSyC5iWXg1sKwZsbh-YpgA58CP8Ulg4q4Y5I")
+model = genai.GenerativeModel("gemini-2.0-flash")
+
+@csrf_exempt
+def ai_travel_suggestions(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            destination = data.get("destination")
+            from_city = data.get("from_city", "your location")
+            travel_date = data.get("travel_date", "next month")
+            return_date = data.get("return_date", "")
+            budget = data.get("budget", "moderate")
+
+            if not destination:
+                return JsonResponse({"error": "Destination is required"}, status=400)
+
+            prompt = f"""
+            You're a travel assistant. Suggest budget-friendly flight and hotel options for the following trip:
+
+            {{
+              "from_city": "{from_city}",
+              "destination": "{destination}",
+              "travel_date": "{travel_date}",
+              "return_date": "{return_date}",
+              "budget": "{budget}"
+            }}
+
+            Please respond in the following JSON format:
+
+            {{
+              "flights": [
+                {{
+                  "airline": "Airline Name",
+                  "price_range": "Approximate Price"
+                }},
+                {{
+                  "airline": "Airline Name",
+                  "price_range": "Approximate Price"
+                }}
+              ],
+              "hotels": [
+                {{
+                  "hotel_name": "Hotel Name",
+                  "price_range": "Approximate Price"
+                }},
+                {{
+                  "hotel_name": "Hotel Name",
+                  "price_range": "Approximate Price"
+                }}
+              ]
+            }}
+
+            List 2-3 airline options and 2-3 hotel names with approximate price ranges. Only return the JSON object as shown above, without any extra text or explanation.
+            """
+
+            def clean_ai_response(ai_response):
+                # Remove code block markers and language labels (e.g., ```json)
+                cleaned = re.sub(r"^```[a-zA-Z]*\n?", "", ai_response.strip())
+                cleaned = re.sub(r"\n?```$", "", cleaned)
+                # Now parse the cleaned string as JSON
+                return json.loads(cleaned)
+
+            response = model.generate_content(prompt)
+            result = clean_ai_response(response.text)
+
+            return JsonResponse({"ai_response": result}, status=200)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Only POST method allowed"}, status=405)
