@@ -30,46 +30,29 @@ const DiscoveryPage = () => {
       setFestivals(results);
       setLoading(false);
     } else {
-      // Fallback to mock data if no results from backend
       fetchFestivals();
     }
   }, [results]);
 
   const fetchFestivals = async () => {
-    console.log('No backend results found, using fallback data');
-    
-    // Simulate loading
-    setTimeout(() => {
-      const mockFestivals: Festival[] = [
-        {
-          _id: "mock1",
-          title: "Electric Dreams Festival - Austin Music Experience",
-          location: "Austin, TX",
-          tags: ["music", "technology", "art"],
-          content: "An electrifying blend of music, technology, and art that brings together the most innovative artists and performers from around the world.",
-          reddit_url: "https://reddit.com/r/festivals/mock1",
-          upvotes: 286,
-          month: "July",
-          vibe_score: 0.42,
-          fetched_at: "2025-01-17T09:37:05.678"
-        },
-        {
-          _id: "mock2",
-          title: "Sunset Food & Music Fest - San Diego Vibes",
-          location: "San Diego, CA",
-          tags: ["food", "music", "culture"],
-          content: "A perfect fusion of culinary delights and musical experiences set against the beautiful San Diego sunset.",
-          reddit_url: "https://reddit.com/r/festivals/mock2",
-          upvotes: 156,
-          month: "July",
-          vibe_score: 0.35,
-          fetched_at: "2025-01-17T09:37:06.678"
-        }
-      ];
-      
-      setFestivals(mockFestivals);
+    setLoading(true);
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/get-all-festivals');
+      if (!response.ok) throw new Error('Failed to fetch festivals');
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setFestivals(data);
+      } else if (Array.isArray(data.festivals)) {
+        setFestivals(data.festivals);
+      } else {
+        setFestivals([]);
+      }
+    } catch (error) {
+      console.error('Error fetching festivals:', error);
+      setFestivals([]);
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   const getVibeEmoji = (vibeScore: number | null) => {
