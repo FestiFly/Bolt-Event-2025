@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, ExternalLink, Video, Mic, Plus, Clock, Star, Share, Heart, ThumbsUp, Loader } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, ExternalLink, Video, Mic, Plus, Clock, Star, Share, Heart, ThumbsUp, Loader, MessageCircle, TrendingUp } from 'lucide-react';
 
 interface FestivalDetail {
   _id: string;
@@ -15,6 +15,12 @@ interface FestivalDetail {
   fetched_at: string;
 }
 
+interface Review {
+  comment: string;
+  post_url: string;
+  score: number;
+}
+
 const FestivalDetailPage = () => {
   const { festivalId } = useParams();
   const navigate = useNavigate();
@@ -24,10 +30,36 @@ const FestivalDetailPage = () => {
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [showReviews, setShowReviews] = useState(false);
 
   useEffect(() => {
     fetchFestivalDetails();
   }, [festivalId]);
+
+  const handleFetchRedditReviews = async () => {
+    if (!festival) return;
+    setLoadingReviews(true);
+    try {
+      const res = await fetch("http://localhost:8000/api/fetch-reddit-reviews/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _id: festival._id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setReviews(data.reviews || []);
+        setShowReviews(true);
+      } else {
+        console.error(data.error);
+      }
+    } catch (err) {
+      console.error("Error fetching reviews:", err);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
 
   const fetchFestivalDetails = async () => {
     if (!festivalId) {
@@ -41,7 +73,7 @@ const FestivalDetailPage = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ _id: festivalId })
-        });
+      });
 
       const data = await response.json();
       
@@ -101,6 +133,19 @@ const FestivalDetailPage = () => {
     return 'Mixed Reviews';
   };
 
+  const getReviewScoreColor = (score: number) => {
+    if (score >= 0.7) return 'text-green-400 bg-green-400/20 border-green-400/30';
+    if (score >= 0.4) return 'text-yellow-400 bg-yellow-400/20 border-yellow-400/30';
+    return 'text-red-400 bg-red-400/20 border-red-400/30';
+  };
+
+  const getReviewScoreEmoji = (score: number) => {
+    if (score >= 0.8) return '🔥';
+    if (score >= 0.6) return '👍';
+    if (score >= 0.4) return '👌';
+    return '😐';
+  };
+
   const getRandomImage = () => {
     const images = [
       'https://images.pexels.com/photos/1105666/pexels-photo-1105666.jpeg',
@@ -118,9 +163,16 @@ const FestivalDetailPage = () => {
   };
 
   const handleAddToCalendar = () => {
-    console.log('Adding to calendar');
-    setShowCalendarModal(true);
-  };
+  const title = encodeURIComponent('Your Event Title');
+  const details = encodeURIComponent('Event details go here.');
+  const location = encodeURIComponent('Event location');
+  const startDate = '20250617T090000Z'; // Format: YYYYMMDDTHHMMSSZ (UTC)
+  const endDate = '20250617T100000Z';
+
+  const calendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}&dates=${startDate}/${endDate}`;
+  setShowCalendarModal(true);
+  window.open(calendarUrl, '_blank');
+};
 
   const handlePlayVideo = () => {
     console.log('Playing AI video');
@@ -272,7 +324,7 @@ const FestivalDetailPage = () => {
             {/* Community Engagement */}
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
               <h2 className="text-2xl font-bold text-white mb-4">Community Engagement</h2>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-2">
                     <ThumbsUp className="h-5 w-5 text-orange-400" />
@@ -295,7 +347,83 @@ const FestivalDetailPage = () => {
                   <span>View on Reddit</span>
                 </a>
               </div>
+
+              {/* Reddit Reviews Button */}
+              <button
+                onClick={handleFetchRedditReviews}
+                disabled={loadingReviews}
+                className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-orange-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:from-orange-700 hover:to-pink-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingReviews ? (
+                  <>
+                    <Loader className="h-5 w-5 animate-spin" />
+                    <span>Fetching Reddit Reviews...</span>
+                  </>
+                ) : (
+                  <>
+                    <MessageCircle className="h-5 w-5" />
+                    <span>Load Reddit Reviews</span>
+                  </>
+                )}
+              </button>
             </div>
+
+            {/* Reddit Reviews Section */}
+            {showReviews && reviews.length > 0 && (
+              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-white flex items-center space-x-2">
+                    <MessageCircle className="h-6 w-6 text-orange-400" />
+                    <span>Reddit Community Reviews</span>
+                  </h2>
+                  <div className="flex items-center space-x-2 px-3 py-1 bg-orange-600/20 rounded-full border border-orange-400/30">
+                    <TrendingUp className="h-4 w-4 text-orange-400" />
+                    <span className="text-orange-200 text-sm font-medium">{reviews.length} reviews</span>
+                  </div>
+                </div>
+
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {reviews.map((review, index) => (
+                    <div
+                      key={index}
+                      className="bg-white/5 rounded-lg p-4 border border-white/10 hover:bg-white/10 transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-lg">{getReviewScoreEmoji(review.score)}</span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getReviewScoreColor(review.score)}`}>
+                            {(review.score * 100).toFixed(0)}% positive
+                          </span>
+                        </div>
+                        <a
+                          href={review.post_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center space-x-1 text-blue-400 hover:text-blue-300 transition-colors text-sm"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          <span>Source</span>
+                        </a>
+                      </div>
+                      
+                      <p className="text-gray-300 leading-relaxed text-sm">
+                        "{review.comment}"
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {showReviews && reviews.length === 0 && (
+              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                <div className="text-center py-8">
+                  <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-white mb-2">No Reviews Found</h3>
+                  <p className="text-gray-400">No community reviews were found for this festival.</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -362,6 +490,12 @@ const FestivalDetailPage = () => {
                     <span className="text-white font-medium text-sm">{getVibeLabel(festival.vibe_score)}</span>
                   </div>
                 </div>
+                {showReviews && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-300">Reviews</span>
+                    <span className="text-white font-medium">{reviews.length}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
