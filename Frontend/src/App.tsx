@@ -6,6 +6,7 @@ import DiscoveryPage from './pages/DiscoveryPage';
 import TripPlannerPage from './pages/TripPlannerPage';
 import OrganizerPanel from './pages/OrganizerPanel';
 import BoltBadge from './components/BoltBadge';
+import FestivalDetailPage from './pages/FestivalDetailPage';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Routes>
           <Route path="/" element={<OnboardingPage />} />
           <Route path="/discover" element={<DiscoveryPage />} />
+          <Route path="/discover/:festivalId" element={<FestivalDetailPage />} />
           <Route path="/trip/:festivalId" element={<TripPlannerPage />} />
           <Route path="/organizer" element={<OrganizerPanel />} />
         </Routes>
