@@ -13,7 +13,7 @@ const OnboardingPage = () => {
   const [showPremium, setShowPremium] = useState(false);
 
   const interestOptions = [
-    'Music', 'Food', 'Art', 'Technology', 'Culture', 'Comedy', 
+    'Music', 'Food', 'Art', 'Technology', 'Culture', 'Comedy',
     'Film', 'Literature', 'Sports', 'Gaming', 'Wellness', 'Dance'
   ];
 
@@ -27,13 +27,30 @@ const OnboardingPage = () => {
   };
 
   const handleFindFestivals = async () => {
-    // TODO: Connect to backend API
-    console.log('Sending to backend:', formData);
-    
-    // Simulate API call
-    setTimeout(() => {
-      navigate('/discover', { state: { searchParams: formData } });
-    }, 1000);
+
+    const payload = {
+      location: formData.location,
+      interests: formData.interests.map(i => i.toLowerCase()),
+      month: formData.startDate, // now directly storing month in startDate
+    };
+
+    try {
+      const response = await fetch('http://localhost:8000/api/recommendations/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        navigate('/discover', { state: { results: data.festivals, searchParams: formData } });
+      } else {
+        alert(data.error || 'Something went wrong. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error connecting to backend:', error);
+      alert('Failed to fetch recommendations.');
+    }
   };
 
   return (
@@ -53,7 +70,6 @@ const OnboardingPage = () => {
 
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 shadow-2xl border border-white/20">
           <div className="space-y-8">
-            {/* Location Input */}
             <div>
               <label className="flex items-center space-x-2 text-white font-semibold mb-4">
                 <MapPin className="h-5 w-5 text-purple-400" />
@@ -68,7 +84,6 @@ const OnboardingPage = () => {
               />
             </div>
 
-            {/* Interests Selection */}
             <div>
               <label className="flex items-center space-x-2 text-white font-semibold mb-4">
                 <Heart className="h-5 w-5 text-purple-400" />
@@ -91,35 +106,26 @@ const OnboardingPage = () => {
               </div>
             </div>
 
-            {/* Date Range */}
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
+            <div>
                 <label className="flex items-center space-x-2 text-white font-semibold mb-4">
                   <Calendar className="h-5 w-5 text-purple-400" />
-                  <span>Start Date</span>
+                  <span>Which month are you planning for?</span>
                 </label>
-                <input
-                  type="date"
+                <select
                   value={formData.startDate}
                   onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
+                >
+                  <option value="">Select a month</option>
+                  {[
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'
+                  ].map(month => (
+                    <option key={month} value={month}>{month}</option>
+                  ))}
+                </select>
               </div>
-              <div>
-                <label className="flex items-center space-x-2 text-white font-semibold mb-4">
-                  <Calendar className="h-5 w-5 text-purple-400" />
-                  <span>End Date</span>
-                </label>
-                <input
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-            </div>
 
-            {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-4">
               <button
                 onClick={handleFindFestivals}
@@ -129,7 +135,7 @@ const OnboardingPage = () => {
                 <Search className="h-5 w-5" />
                 <span>Find Festivals</span>
               </button>
-              
+
               <button
                 onClick={() => setShowPremium(true)}
                 className="flex items-center justify-center space-x-2 px-6 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-black rounded-lg font-semibold hover:from-yellow-600 hover:to-orange-600 transition-all shadow-lg hover:shadow-xl"
@@ -141,7 +147,6 @@ const OnboardingPage = () => {
           </div>
         </div>
 
-        {/* Premium Modal */}
         {showPremium && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-md w-full border border-white/20">
@@ -163,7 +168,6 @@ const OnboardingPage = () => {
                   </button>
                   <button
                     onClick={() => {
-                      // TODO: Connect to RevenueCat
                       console.log('Premium upgrade requested');
                       setShowPremium(false);
                     }}
