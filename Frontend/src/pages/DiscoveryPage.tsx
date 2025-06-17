@@ -30,6 +30,7 @@ const DiscoveryPage = () => {
       setFestivals(results);
       setLoading(false);
     } else {
+      // Fallback to mock data if no results from backend
       fetchFestivals();
     }
   }, [results]);
@@ -235,7 +236,7 @@ const DiscoveryPage = () => {
                     onClick={() => navigate(`/trip/${festival._id}`)}
                     className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl text-sm"
                   >
-                    Plan Trip
+                    View Details
                   </button>
                   <a
                     href={festival.reddit_url}

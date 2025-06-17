@@ -1,20 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, ExternalLink, Video, Mic, Plus, Clock, Star, Share, Heart } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, ExternalLink, Video, Mic, Plus, Clock, Star, Share, Heart, ThumbsUp, Loader, MessageCircle, TrendingUp } from 'lucide-react';
 
 interface FestivalDetail {
-  id: string;
-  name: string;
+  _id: string;
+  title: string;
   location: string;
-  dates: string;
-  description: string;
-  venue: string;
-  ticketPrice: string;
-  lineup: string[];
-  amenities: string[];
-  weatherForecast: string;
-  image: string;
-  mapUrl: string;
+  tags: string[];
+  reddit_url: string;
+  upvotes: number;
+  month: string;
+  vibe_score: number | null;
+  content: string | null;
+  fetched_at: string;
+}
+
+interface Review {
+  comment: string;
+  post_url: string;
+  score: number;
 }
 
 const TripPlannerPage = () => {
@@ -22,54 +26,171 @@ const TripPlannerPage = () => {
   const navigate = useNavigate();
   const [festival, setFestival] = useState<FestivalDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [showReviews, setShowReviews] = useState(false);
 
   useEffect(() => {
     fetchFestivalDetails();
   }, [festivalId]);
 
+  const handleFetchRedditReviews = async () => {
+    if (!festival) return;
+    setLoadingReviews(true);
+    try {
+      const res = await fetch("http://localhost:8000/api/fetch-reddit-reviews/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _id: festival._id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setReviews(data.reviews || []);
+        setShowReviews(true);
+      } else {
+        console.error(data.error);
+      }
+    } catch (err) {
+      console.error("Error fetching reviews:", err);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
   const fetchFestivalDetails = async () => {
-    // TODO: Connect to backend API
-    console.log('Fetching festival details for ID:', festivalId);
-    
-    // Simulate API response
-    setTimeout(() => {
-      const mockFestival: FestivalDetail = {
-        id: festivalId!,
-        name: 'Electric Dreams Festival',
-        location: 'Austin, TX',
-        dates: 'March 15-17, 2024',
-        description: 'An electrifying blend of music, technology, and art that brings together the most innovative artists and performers from around the world.',
-        venue: 'Zilker Park',
-        ticketPrice: '$299 - $599',
-        lineup: ['Deadmau5', 'Porter Robinson', 'ODESZA', 'Flume', 'Disclosure', 'Chrome Sparks'],
-        amenities: ['Food Trucks', 'Art Installations', 'VIP Areas', 'Charging Stations', 'Medical Tent', 'Lost & Found'],
-        weatherForecast: 'Partly cloudy, 75°F high, 55°F low',
-        image: 'https://images.pexels.com/photos/1105666/pexels-photo-1105666.jpeg',
-        mapUrl: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3445.2936332465836!2d-97.77311068488116!3d30.26371408181688!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8644b5a85b7aa3e9%3A0x7b5c4d8b2e8a9f8e!2sZilker%20Park%2C%20Austin%2C%20TX!5e0!3m2!1sen!2sus!4v1635789456789!5m2!1sen!2sus'
-      };
-      
-      setFestival(mockFestival);
+    if (!festivalId) {
+      setError('Festival ID not provided');
       setLoading(false);
-    }, 1000);
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:8000/api/festival-detail/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ _id: festivalId })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        setFestival(data.festival);
+      } else {
+        setError(data.error || 'Failed to fetch festival details');
+      }
+    } catch (error) {
+      console.error('Error fetching festival details:', error);
+      setError('Failed to connect to server');
+      
+      // Fallback to mock data for development
+      setTimeout(() => {
+        const mockFestival: FestivalDetail = {
+          _id: festivalId!,
+          title: "I'm a festival owner who has hosted 50 fests, and I'm publicly sharing my budget.",
+          location: "Paige, TX",
+          tags: ["music", "culture", "arts"],
+          reddit_url: "https://reddit.com/r/festivals/comments/1g1bubm/im_a_festival_owner_who_has_hosted_50_fests_and/",
+          upvotes: 2395,
+          month: "October",
+          vibe_score: 0.06,
+          content: "Hi all! I'm the owner of Astronox, a music and arts festival taking place Oct 17-21 at Valkyrie Ranch in Paige, TX. I've decided to share my budget publicly because I think this is very important to help the community understand just what it takes to make these things possible. Please let me know if you have any questions and I'll be happy to answer them! Hopefully this helps people understand what it takes to make these events possible. Astronox.net",
+          fetched_at: "2025-06-17T06:12:16.835"
+        };
+        
+        setFestival(mockFestival);
+        setError(null);
+      }, 1000);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const getVibeEmoji = (vibeScore: number | null) => {
+    if (vibeScore === null) return '😐';
+    if (vibeScore >= 0.3) return '🎉';
+    if (vibeScore >= 0.15) return '😊';
+    if (vibeScore >= 0) return '😐';
+    return '😕';
+  };
+
+  const getVibeColor = (vibeScore: number | null) => {
+    if (vibeScore === null) return 'border-gray-400 bg-gray-400/20';
+    if (vibeScore >= 0.3) return 'border-green-400 bg-green-400/20';
+    if (vibeScore >= 0.15) return 'border-yellow-400 bg-yellow-400/20';
+    if (vibeScore >= 0) return 'border-blue-400 bg-blue-400/20';
+    return 'border-red-400 bg-red-400/20';
+  };
+
+  const getVibeLabel = (vibeScore: number | null) => {
+    if (vibeScore === null) return 'Unknown Vibe';
+    if (vibeScore >= 0.3) return 'Highly Positive';
+    if (vibeScore >= 0.15) return 'Positive';
+    if (vibeScore >= 0) return 'Neutral';
+    return 'Mixed Reviews';
+  };
+
+  const getReviewScoreColor = (score: number) => {
+    if (score >= 0.7) return 'text-green-400 bg-green-400/20 border-green-400/30';
+    if (score >= 0.4) return 'text-yellow-400 bg-yellow-400/20 border-yellow-400/30';
+    return 'text-red-400 bg-red-400/20 border-red-400/30';
+  };
+
+  const getReviewScoreEmoji = (score: number) => {
+    if (score >= 0.8) return '🔥';
+    if (score >= 0.6) return '👍';
+    if (score >= 0.4) return '👌';
+    return '😐';
+  };
+
+  const getRandomImage = () => {
+    const images = [
+      'https://images.pexels.com/photos/1105666/pexels-photo-1105666.jpeg',
+      'https://images.pexels.com/photos/1190298/pexels-photo-1190298.jpeg',
+      'https://images.pexels.com/photos/2747449/pexels-photo-2747449.jpeg',
+      'https://images.pexels.com/photos/1763075/pexels-photo-1763075.jpeg',
+      'https://images.pexels.com/photos/2263436/pexels-photo-2263436.jpeg',
+      'https://images.pexels.com/photos/1540406/pexels-photo-1540406.jpeg'
+    ];
+    return images[Math.floor(Math.random() * images.length)];
+  };
+
+  const formatDate = (month: string) => {
+    return `${month} 2024`;
+  };
+
+  const truncateContent = (content: string | null, maxLength: number = 150) => {
+    if (!content) return 'Discover this amazing festival experience...';
+    if (content.length <= maxLength) return content;
+    return content.substring(0, maxLength) + '...';
   };
 
   const handleAddToCalendar = () => {
-    // TODO: Integrate with Google Calendar API
-    console.log('Adding to calendar');
-    setShowCalendarModal(true);
-  };
+  setShowCalendarModal(true);
+};
+
+const generateGoogleCalendarLink = () => {
+  const festivalName = encodeURIComponent(festival.title);
+  const festivalLocation = encodeURIComponent(festival.location);
+  const festivalDescription = encodeURIComponent(festival.content || 'Discover this amazing festival experience...');
+
+  // Assuming the festival is a single-day event in October 2024
+  const festivalDate = new Date(`October 1, 2024`).toISOString().replace(/[-:]/g, '').replace('Z', '');
+  const startDate = festivalDate.substring(0, 8) + 'T000000';
+  const endDate = festivalDate.substring(0, 8) + 'T235959';
+
+  return `https://www.google.com/calendar/render?action=TEMPLATE&text=${festivalName}&dates=${startDate}/${endDate}&details=${festivalDescription}&location=${festivalLocation}`;
+};
 
   const handlePlayVideo = () => {
-    // TODO: Integrate with Tavus
     console.log('Playing AI video');
     setShowVideoModal(true);
   };
 
   const handleVoiceAssistant = () => {
-    // TODO: Integrate with ElevenLabs
     console.log('Opening voice assistant');
     setShowVoiceModal(true);
   };
@@ -78,8 +199,24 @@ const TripPlannerPage = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400 mx-auto mb-4"></div>
+          <Loader className="h-12 w-12 text-purple-400 animate-spin mx-auto mb-4" />
           <p className="text-white text-xl">Loading festival details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !festival) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-white text-xl mb-4">Error: {error}</p>
+          <button
+            onClick={() => navigate('/discover')}
+            className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            Back to Discovery
+          </button>
         </div>
       </div>
     );
@@ -121,16 +258,16 @@ const TripPlannerPage = () => {
             {/* Hero Section */}
             <div className="relative rounded-2xl overflow-hidden">
               <img
-                src={festival.image}
-                alt={festival.name}
+                src={getRandomImage()}
+                alt={festival.title}
                 className="w-full h-64 md:h-80 object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
               <div className="absolute bottom-6 left-6 right-6">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-                      {festival.name}
+                    <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 line-clamp-3">
+                      {festival.title}
                     </h1>
                     <div className="flex items-center space-x-4 text-gray-200">
                       <div className="flex items-center space-x-1">
@@ -139,7 +276,7 @@ const TripPlannerPage = () => {
                       </div>
                       <div className="flex items-center space-x-1">
                         <Calendar className="h-4 w-4" />
-                        <span>{festival.dates}</span>
+                        <span>{formatDate(festival.month)}</span>
                       </div>
                     </div>
                   </div>
@@ -156,29 +293,38 @@ const TripPlannerPage = () => {
             </div>
 
             {/* Description */}
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
-              <h2 className="text-2xl font-bold text-white mb-4">About This Festival</h2>
-              <p className="text-gray-300 leading-relaxed mb-6">{festival.description}</p>
+            <div className={`bg-white/10 backdrop-blur-lg rounded-2xl p-6 border-2 ${getVibeColor(festival.vibe_score)}`}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-white">About This Festival</h2>
+                <div className="flex items-center space-x-2">
+                  <span className="text-2xl">{getVibeEmoji(festival.vibe_score)}</span>
+                  <span className="text-sm text-gray-300">{getVibeLabel(festival.vibe_score)}</span>
+                </div>
+              </div>
+              
+              <p className="text-gray-300 leading-relaxed mb-6">
+                {festival.content || 'Discover this amazing festival experience...'}
+              </p>
               
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-3">Venue Details</h3>
+                  <h3 className="text-lg font-semibold text-white mb-3">Festival Details</h3>
                   <div className="space-y-2 text-gray-300">
-                    <p><span className="font-medium">Location:</span> {festival.venue}</p>
-                    <p><span className="font-medium">Ticket Price:</span> {festival.ticketPrice}</p>
-                    <p><span className="font-medium">Weather:</span> {festival.weatherForecast}</p>
+                    <p><span className="font-medium">Location:</span> {festival.location}</p>
+                    <p><span className="font-medium">Month:</span> {formatDate(festival.month)}</p>
+                    <p><span className="font-medium">Community Score:</span> {festival.vibe_score?.toFixed(2) || 'N/A'}</p>
                   </div>
                 </div>
                 
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-3">Amenities</h3>
+                  <h3 className="text-lg font-semibold text-white mb-3">Tags</h3>
                   <div className="flex flex-wrap gap-2">
-                    {festival.amenities.map((amenity) => (
+                    {festival.tags.map((tag) => (
                       <span
-                        key={amenity}
-                        className="px-3 py-1 bg-blue-600/30 text-blue-200 rounded-full text-sm border border-blue-400/30"
+                        key={tag}
+                        className="px-3 py-1 bg-purple-600/30 text-purple-200 rounded-full text-sm border border-purple-400/30 capitalize"
                       >
-                        {amenity}
+                        {tag}
                       </span>
                     ))}
                   </div>
@@ -186,39 +332,109 @@ const TripPlannerPage = () => {
               </div>
             </div>
 
-            {/* Lineup */}
+            {/* Community Engagement */}
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
-              <h2 className="text-2xl font-bold text-white mb-4">Featured Artists</h2>
-              <div className="grid md:grid-cols-2 gap-3">
-                {festival.lineup.map((artist, index) => (
-                  <div
-                    key={artist}
-                    className="flex items-center space-x-3 p-3 bg-white/5 rounded-lg border border-white/10"
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 bg-purple-600 rounded-full text-white font-bold text-sm">
-                      {index + 1}
-                    </div>
-                    <span className="text-white font-medium">{artist}</span>
+              <h2 className="text-2xl font-bold text-white mb-4">Community Engagement</h2>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <ThumbsUp className="h-5 w-5 text-orange-400" />
+                    <span className="text-white font-semibold">{festival.upvotes} upvotes</span>
                   </div>
-                ))}
+                  <div className="flex items-center space-x-2">
+                    <Clock className="h-5 w-5 text-blue-400" />
+                    <span className="text-gray-300">
+                      Fetched {new Date(festival.fetched_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+                <a
+                  href={festival.reddit_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center space-x-2 px-4 py-2 bg-orange-600/20 text-orange-200 border border-orange-400/30 rounded-lg hover:bg-orange-600/30 transition-colors"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  <span>View on Reddit</span>
+                </a>
               </div>
+
+              {/* Reddit Reviews Button */}
+              <button
+                onClick={handleFetchRedditReviews}
+                disabled={loadingReviews}
+                className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-orange-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:from-orange-700 hover:to-pink-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingReviews ? (
+                  <>
+                    <Loader className="h-5 w-5 animate-spin" />
+                    <span>Fetching Reddit Reviews...</span>
+                  </>
+                ) : (
+                  <>
+                    <MessageCircle className="h-5 w-5" />
+                    <span>Load Reddit Reviews</span>
+                  </>
+                )}
+              </button>
             </div>
 
-            {/* Map */}
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
-              <h2 className="text-2xl font-bold text-white mb-4">Location</h2>
-              <div className="aspect-video rounded-lg overflow-hidden">
-                <iframe
-                  src={festival.mapUrl}
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0 }}
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                ></iframe>
+            {/* Reddit Reviews Section */}
+            {showReviews && reviews.length > 0 && (
+              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-white flex items-center space-x-2">
+                    <MessageCircle className="h-6 w-6 text-orange-400" />
+                    <span>Reddit Community Reviews</span>
+                  </h2>
+                  <div className="flex items-center space-x-2 px-3 py-1 bg-orange-600/20 rounded-full border border-orange-400/30">
+                    <TrendingUp className="h-4 w-4 text-orange-400" />
+                    <span className="text-orange-200 text-sm font-medium">{reviews.length} reviews</span>
+                  </div>
+                </div>
+
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {reviews.map((review, index) => (
+                    <div
+                      key={index}
+                      className="bg-white/5 rounded-lg p-4 border border-white/10 hover:bg-white/10 transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-lg">{getReviewScoreEmoji(review.score)}</span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getReviewScoreColor(review.score)}`}>
+                            {(review.score * 100).toFixed(0)}% positive
+                          </span>
+                        </div>
+                        <a
+                          href={review.post_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center space-x-1 text-blue-400 hover:text-blue-300 transition-colors text-sm"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          <span>Source</span>
+                        </a>
+                      </div>
+                      
+                      <p className="text-gray-300 leading-relaxed text-sm">
+                        "{review.comment}"
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {showReviews && reviews.length === 0 && (
+              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                <div className="text-center py-8">
+                  <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-white mb-2">No Reviews Found</h3>
+                  <p className="text-gray-400">No community reviews were found for this festival.</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -250,16 +466,13 @@ const TripPlannerPage = () => {
               </button>
 
               <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  // TODO: Connect to booking platform
-                  console.log('Opening booking link');
-                }}
+                href={festival.reddit_url}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
               >
                 <ExternalLink className="h-5 w-5" />
-                <span>Book Tickets</span>
+                <span>View Original Post</span>
               </a>
             </div>
 
@@ -268,20 +481,32 @@ const TripPlannerPage = () => {
               <h3 className="text-lg font-semibold text-white mb-4">Quick Stats</h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-300">Duration</span>
-                  <span className="text-white font-medium">3 Days</span>
+                  <span className="text-gray-300">Community Score</span>
+                  <span className="text-white font-medium">
+                    {festival.vibe_score?.toFixed(2) || 'N/A'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-300">Artists</span>
-                  <span className="text-white font-medium">{festival.lineup.length}+</span>
+                  <span className="text-gray-300">Upvotes</span>
+                  <span className="text-white font-medium">{festival.upvotes}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-300">Rating</span>
+                  <span className="text-gray-300">Tags</span>
+                  <span className="text-white font-medium">{festival.tags.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-300">Vibe</span>
                   <div className="flex items-center space-x-1">
-                    <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                    <span className="text-white font-medium">4.8</span>
+                    <span className="text-lg">{getVibeEmoji(festival.vibe_score)}</span>
+                    <span className="text-white font-medium text-sm">{getVibeLabel(festival.vibe_score)}</span>
                   </div>
                 </div>
+                {showReviews && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-300">Reviews</span>
+                    <span className="text-white font-medium">{reviews.length}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -304,16 +529,14 @@ const TripPlannerPage = () => {
                   >
                     Cancel
                   </button>
-                  <button
-                    onClick={() => {
-                      // TODO: Google Calendar integration
-                      console.log('Calendar integration');
-                      setShowCalendarModal(false);
-                    }}
+                  <a
+                    href={generateGoogleCalendarLink()}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    Add Event
-                  </button>
+                    Add to Google Calendar
+                  </a>
                 </div>
               </div>
             </div>
