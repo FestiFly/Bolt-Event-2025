@@ -198,6 +198,80 @@ def get_festival_by_id(request):
 
     except Exception as e:
         return JsonResponse({"error": f"Server error: {str(e)}"}, status=500)
+
+@csrf_exempt
+@api_view(["POST"])
+def fetch_reddit_reviews_by_id(request):
+    try:
+        data = json.loads(request.body)
+        festival_id = data.get("_id")
+
+        if not festival_id:
+            return JsonResponse({"error": "_id is required"}, status=400)
+
+        # Fetch festival from DB
+        festival = festival_collection.find_one({"_id": ObjectId(festival_id)})
+        if not festival:
+            return JsonResponse({"error": "Festival not found in database."}, status=404)
+
+        title = festival.get("title", "")
+        location = festival.get("location", "")
+        month = festival.get("month", "")
+        search_query = f"{title} {location} {month} festival"
+
+        print(f"Reddit review query: {search_query}")
+
+        comments_collected = []
+
+        for subreddit in RELEVANT_SUBREDDITS:
+            url = f"https://www.reddit.com/r/{subreddit}/search.json"
+            params = {
+                "q": search_query,
+                "restrict_sr": "true",
+                "sort": "top",
+                "limit": 5,
+                "t": "year"
+            }
+
+            res = requests.get(url, headers=HEADERS, params=params)
+            if res.status_code != 200:
+                continue
+
+            posts = res.json().get("data", {}).get("children", [])
+            for post in posts:
+                post_data = post.get("data", {})
+                permalink = post_data.get("permalink")
+
+                if not permalink:
+                    continue  # skip posts without valid permalink
+
+                try:
+                    post_id = permalink.split("/comments/")[1].split("/")[0]
+                    submission = reddit.submission(id=post_id)
+                    submission.comments.replace_more(limit=0)
+                    top_comments = [comment.body for comment in submission.comments[:5]]
+
+                    for comment_text in top_comments:
+                        comments_collected.append({
+                            "comment": comment_text,
+                            "post_url": f"https://reddit.com{permalink}",
+                            "score": TextBlob(comment_text).sentiment.polarity
+                        })
+                except Exception as e:
+                    print(f"Error processing post: {e}")
+
+        comments_collected.sort(key=lambda x: x["score"], reverse=True)
+
+        # Save to DB under 'reddit_review' array
+        festival_collection.update_one(
+            {"_id": ObjectId(festival_id)},
+            {"$push": {"reddit_review": {"$each": comments_collected}}}
+        )
+
+        return JsonResponse({"message": "Reviews saved.", "reviews": comments_collected}, status=200)
+
+    except Exception as e:
+        return JsonResponse({"error": f"Server error: {str(e)}"}, status=500)
     
 @csrf_exempt
 def ai_travel_suggestions(request):
