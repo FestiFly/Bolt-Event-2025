@@ -248,3 +248,34 @@ def ai_travel_suggestions(request):
             return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"error": "Only POST method allowed"}, status=405)
+
+@csrf_exempt
+def get_all_festivals(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Only GET method is allowed."}, status=405)
+
+    try:
+        festivals_cursor = festival_collection.find()
+        festivals = []
+        for fest in festivals_cursor:
+            fest_copy = copy.deepcopy(fest)
+            fest_copy["_id"] = str(fest_copy.get("_id", ""))
+            festivals.append({
+                "_id": fest_copy.get("_id"),
+                "title": fest_copy.get("title"),
+                "location": fest_copy.get("location"),
+                "tags": fest_copy.get("tags"),
+                "content": fest_copy.get("content"),
+                "reddit_url": fest_copy.get("reddit_url"),
+                "upvotes": fest_copy.get("upvotes"),
+                "month": fest_copy.get("month"),
+                "vibe_score": fest_copy.get("vibe_score"),
+                "fetched_at": fest_copy.get("fetched_at")
+            })
+
+        return JsonResponse({"festivals": festivals}, status=200)
+
+    except PyMongoError as e:
+        return JsonResponse({"error": f"MongoDB error: {str(e)}"}, status=500)
+    except Exception as e:
+        return JsonResponse({"error": f"Server error: {str(e)}"}, status=500)

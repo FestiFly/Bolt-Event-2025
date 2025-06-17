@@ -4,7 +4,8 @@ from .organizer import *
 
 urlpatterns = [
     path('recommendations/', get_recommendations, name='get_recommendations'),
-    path('ai-travel-suggestions/', ai_travel_suggestions, name='ai_travel_suggestions'),  
+    path('ai-travel-suggestions/', ai_travel_suggestions, name='ai_travel_suggestions'), 
+    path('get-all-festivals/', get_all_festivals, name='get_all_festivals'), 
 
     #organizer urls
     path('organizer/signup/', organizer_signup, name='organizer-signup'), 
