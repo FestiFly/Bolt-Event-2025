@@ -30,13 +30,31 @@ const OrganizerPanel = () => {
     }
   }, [isAuthenticated]);
 
-  const handleLogin = () => {
-    // TODO: Implement proper authentication or connect to backend
-    if (loginForm.username === 'admin' && loginForm.password === 'festifly2024') {
-      setIsAuthenticated(true);
-      console.log('Admin authenticated');
-    } else {
-      alert('Invalid credentials. Use admin/festifly2024 for demo.');
+  const handleLogin = async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/organizer/login/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: loginForm.username,
+          password: loginForm.password,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error('Invalid credentials');
+      }
+      const data = await response.json();
+      if (data.token) {
+        setIsAuthenticated(true);
+        document.cookie = `jwt=${data.token}; path=/; secure; samesite=strict`;
+        console.log('Admin authenticated, token:', data.token);
+      } else {
+        alert('Invalid credentials.');
+      }
+    } catch (error) {
+      alert('Invalid credentials.');
     }
   };
 
@@ -165,11 +183,6 @@ const OrganizerPanel = () => {
                 Login
               </button>
               
-              <div className="text-center">
-                <p className="text-gray-400 text-sm">
-                  Demo credentials: admin / festifly2024
-                </p>
-              </div>
             </div>
           </div>
         </div>
