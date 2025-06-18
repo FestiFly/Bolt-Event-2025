@@ -9,7 +9,7 @@ urlpatterns = [
     path('get-all-festivals/', get_all_festivals, name='get_all_festivals'), 
     path("fetch-reddit-reviews/", fetch_reddit_reviews_by_id, name="fetch_reddit_reviews"),
     path("generate-voice-briefing/", generate_voice_briefing, name="generate_voice_briefing"),
-
+    path("generate-ai-video/", generate_ai_video, name="generate_ai_video"),
 
     #organizer urls
     path('organizer/signup/', organizer_signup, name='organizer-signup'), 
