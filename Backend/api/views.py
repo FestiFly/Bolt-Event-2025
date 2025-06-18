@@ -379,6 +379,8 @@ def get_all_festivals(request):
 @api_view(["POST"])
 def generate_voice_briefing(request):
     try:
+        import base64
+
         data = json.loads(request.body)
         festival_id = data.get("_id")
         language = data.get("language", "en").lower()
@@ -391,16 +393,18 @@ def generate_voice_briefing(request):
         if not fest:
             return JsonResponse({"error": "Festival not found"}, status=404)
 
-        # ✅ Return early if already generated
+        # ✅ Return cached result if available
         cached_audio = fest.get(f"ai_voice_url_{language}")
         cached_script = fest.get(f"ai_voice_script_{language}")
-        if cached_audio and cached_script:
+        cached_blob = fest.get(f"ai_voice_blob_{language}")
+        if cached_audio and cached_script and cached_blob:
             return JsonResponse({
                 "script": cached_script,
-                "audio_url": cached_audio
+                "audio_url": cached_audio,
+                "audio_blob": cached_blob
             })
 
-        # Voice mapping based on language
+        # 🎙️ Language → Voice ID mapping
         VOICE_MAP_BY_LANG = {
             "en": "EXAVITQu4vr4xnSDxMaL",             # English Mamme
             "ta": "gCr8TeSJgJaeaIoV4RWH",              # Tamil Akka
@@ -408,7 +412,7 @@ def generate_voice_briefing(request):
         }
         voice_id = VOICE_MAP_BY_LANG.get(language, VOICE_MAP_BY_LANG["en"])
 
-        # Compose AI prompt
+        # 🧠 Compose prompt for Gemini
         reviews = fest.get("reddit_review", [])[:3]
         review_summary = "\n".join(f"- {r['comment']}" for r in reviews)
 
@@ -426,11 +430,11 @@ def generate_voice_briefing(request):
         Keep it natural, spoken, and friendly.
         """
 
-        # Gemini to generate script
+        # 🎯 Generate script
         response = model.generate_content(prompt)
         script_en = response.text.strip()
 
-        # Translate if non-English
+        # 🌐 Translate if needed
         final_script = script_en
         if language != "en":
             translate_url = "https://translate.googleapis.com/translate_a/single"
@@ -445,7 +449,7 @@ def generate_voice_briefing(request):
             translated = res.json()[0]
             final_script = "".join([line[0] for line in translated])
 
-        # ElevenLabs TTS
+        # 🗣️ ElevenLabs TTS
         eleven_api_key = "sk_ef9305110b34246545463b96bea287d63816fd6c78398d6d"
         tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 
@@ -466,26 +470,32 @@ def generate_voice_briefing(request):
         if res.status_code != 200:
             return JsonResponse({"error": "Voice generation failed", "details": res.text}, status=500)
 
-        # Save voice file
+        # 💾 Save locally (optional)
         filename = f"{festival_id}_{language}.mp3"
         audio_path = f"static/voices/{filename}"
         os.makedirs("static/voices", exist_ok=True)
         with open(audio_path, "wb") as f:
             f.write(res.content)
 
-        # Cache in MongoDB
+        # 🔐 Convert to base64 for Mongo
+        audio_base64 = base64.b64encode(res.content).decode("utf-8")
+
+        # 🧠 Cache in DB
         festival_collection.update_one(
             {"_id": ObjectId(festival_id)},
             {"$set": {
                 f"ai_voice_script_{language}": final_script,
-                f"ai_voice_url_{language}": f"/static/voices/{filename}"
+                f"ai_voice_url_{language}": f"/static/voices/{filename}",
+                f"ai_voice_blob_{language}": audio_base64
             }}
         )
 
         return JsonResponse({
             "script": final_script,
-            "audio_url": f"/static/voices/{filename}"
+            "audio_url": f"/static/voices/{filename}",
+            "audio_blob": audio_base64
         })
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+

@@ -250,10 +250,25 @@ const TripPlannerPage = () => {
       const data = await response.json();
       console.log('Voice API Response:', data); // Debug log
       
-      if (response.ok && data.script && data.audio_url) {
+      if (response.ok && data.script) {
         setVoiceScript(data.script);
-        setAudioUrl(`http://localhost:8000${data.audio_url}`);
         setVoiceError(null);
+
+        if (data.audio_url) {
+          setAudioUrl(`http://localhost:8000${data.audio_url}`);
+        } else if (data.audio_blob) {
+          // Convert base64 to Blob URL
+          const byteCharacters = atob(data.audio_blob);
+          const byteArrays = [];
+
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteArrays.push(byteCharacters.charCodeAt(i));
+          }
+
+          const blob = new Blob([new Uint8Array(byteArrays)], { type: 'audio/mpeg' });
+          const blobUrl = URL.createObjectURL(blob);
+          setAudioUrl(blobUrl);
+        }
       } else {
         console.error("Voice Assistant Error:", data.error || 'Invalid response format');
         setVoiceError(data.error || 'Failed to generate voice briefing');
