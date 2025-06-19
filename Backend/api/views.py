@@ -284,70 +284,126 @@ def fetch_reddit_reviews_by_id(request):
     except Exception as e:
         return JsonResponse({"error": f"Server error: {str(e)}"}, status=500)
     
+
 @csrf_exempt
-def ai_travel_suggestions(request):
+def smart_planner(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
+
+            # Required
+            festival_name = data.get("festival_name")
             destination = data.get("destination")
-            from_city = data.get("from_city", "your location")
-            travel_date = data.get("travel_date", "next month")
-            return_date = data.get("return_date", "")
-            budget = data.get("budget", "moderate")
+            start_date = data.get("start_date")
+            end_date = data.get("end_date")
 
-            if not destination:
-                return JsonResponse({"error": "Destination is required"}, status=400)
+            # Optional
+            from_city = data.get("from_city", "your city")
+            preferences = data.get("preferences", [])
+            accessibility_needs = data.get("accessibility_needs", [])  # e.g., ["wheelchair", "sign_language"]
+            include_real_time = data.get("include_real_time", False)  # Flag for real-time updates
 
+            if not all([festival_name, destination, start_date, end_date]):
+                return JsonResponse({"error": "Festival name, destination, start_date, and end_date are required."}, status=400)
+
+            # 💬 AI Prompt
             prompt = f"""
-            You're a travel assistant. Suggest budget-friendly flight and hotel options for the following trip:
+You are a smart travel and event planning assistant.
 
-            {{
-              "from_city": "{from_city}",
-              "destination": "{destination}",
-              "travel_date": "{travel_date}",
-              "return_date": "{return_date}",
-              "budget": "{budget}"
-            }}
+Create a 3-4 day itinerary for a user attending the "{festival_name}" in {destination}.
+The festival is from {start_date} to {end_date}. The user is traveling from {from_city}.
+Preferences: {', '.join(preferences)}.
+Accessibility Needs: {', '.join(accessibility_needs) if accessibility_needs else 'None'}.
+{'Include real-time weather and event updates if available.' if include_real_time else ''}
 
-            Please respond in the following JSON format:
+Include:
+- Suggested travel (flights or train)
+- Accommodation options with accessibility details if needed
+- Local transportation ideas
+- Morning, afternoon, evening activity suggestions (with times and map coordinates)
+- Nearby attractions or food spots
+- A fun tip or highlight for each day
+- Real-time weather forecast and event updates if requested
+- Accessibility information for venues and transport if needed
+- Interactive map data (venue coordinates, estimated crowd density)
 
-            {{
-              "flights": [
-                {{
-                  "airline": "Airline Name",
-                  "price_range": "Approximate Price"
-                }},
-                {{
-                  "airline": "Airline Name",
-                  "price_range": "Approximate Price"
-                }}
-              ],
-              "hotels": [
-                {{
-                  "hotel_name": "Hotel Name",
-                  "price_range": "Approximate Price"
-                }},
-                {{
-                  "hotel_name": "Hotel Name",
-                  "price_range": "Approximate Price"
-                }}
-              ]
-            }}
+Respond in this JSON format:
 
-            List 2-3 airline options and 2-3 hotel names with approximate price ranges. Only return the JSON object as shown above, without any extra text or explanation.
-            """
+{{
+  "itinerary": [
+    {{
+      "date": "YYYY-MM-DD",
+      "morning": {{
+        "activity": "description",
+        "time": "HH:MM",
+        "location": {{ "lat": float, "lng": float }},
+        "accessibility": "details or None",
+        "crowd_density": "low/medium/high"
+      }},
+      "afternoon": {{
+        "activity": "description",
+        "time": "HH:MM",
+        "location": {{ "lat": float, "lng": float }},
+        "accessibility": "details or None",
+        "crowd_density": "low/medium/high"
+      }},
+      "evening": {{
+        "activity": "description",
+        "time": "HH:MM",
+        "location": {{ "lat": float, "lng": float }},
+        "accessibility": "details or None",
+        "crowd_density": "low/medium/high"
+      }},
+      "tip": "fun tip for the day",
+      "weather_forecast": "brief forecast or null",
+      "event_updates": "update details or null"
+    }},
+    ...
+  ],
+  "travel": [
+    {{
+      "mode": "flight/train",
+      "provider": "Airline/Rail name",
+      "price_range": "₹xxx - ₹xxx",
+      "accessibility": "details or None"
+    }}
+  ],
+  "hotels": [
+    {{
+      "hotel_name": "Hotel Name",
+      "price_range": "₹xxx - ₹xxx",
+      "accessibility": "details or None",
+      "location": {{ "lat": float, "lng": float }}
+    }}
+  ],
+  "map_data": {{
+    "festival_center": {{ "lat": float, "lng": float }},
+    "key_locations": [
+      {{ "name": "location name", "lat": float, "lng": float, "type": "stage/food/restroom" }}
+    ]
+  }}
+}}
+
+Only return valid JSON. No extra explanation or text.
+"""
 
             def clean_ai_response(ai_response):
-                # Remove code block markers and language labels (e.g., ```json)
                 cleaned = re.sub(r"^```[a-zA-Z]*\n?", "", ai_response.strip())
                 cleaned = re.sub(r"\n?```$", "", cleaned)
-                # Now parse the cleaned string as JSON
                 return json.loads(cleaned)
 
             response = model.generate_content(prompt)
-            result = clean_ai_response(response.text)
+            result_text = response.text.strip()
 
-            return JsonResponse({"ai_response": result}, status=200)
+            try:
+                result = clean_ai_response(result_text)
+                return JsonResponse({"smart_itinerary": result}, status=200)
+            except Exception as parse_error:
+                return JsonResponse({
+                    "error": "AI response could not be parsed.",
+                    "raw": result_text,
+                    "details": str(parse_error)
+                }, status=500)
 
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
