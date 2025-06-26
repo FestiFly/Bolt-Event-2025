@@ -194,6 +194,47 @@ def user_login(request):
     return JsonResponse({"error": "Only POST method is allowed."}, status=405)
 
 
+# Update this function to properly handle timezone differences
+def check_subscription_expiry(user):
+    """Check if a user's premium subscription has expired and update accordingly"""
+    if not user or 'premium' not in user or not user['premium'].get('is_active', False):
+        return user
+    
+    # Check if the expiration date has passed
+    expiry_date = user['premium'].get('expires_at')
+    if not expiry_date:
+        return user
+    
+    # We'll compare IST stored time with current IST time
+    now_ist = datetime.utcnow() + timedelta(hours=5, minutes=30)
+    
+    # Print debug information - already in IST since we store in IST
+    print(f"Checking subscription expiry for user {user['_id']}:")
+    print(f"Current IST time: {now_ist}")
+    print(f"Expiry IST time: {expiry_date}")
+    print(f"Is expired: {expiry_date < now_ist}")
+    
+    # If expired, update the premium status
+    if expiry_date < now_ist:
+        # Mark subscription as expired but keep historical data
+        users_collection.update_one(
+            {"_id": user["_id"]},
+            {"$set": {
+                "premium.is_active": False,
+                "premium.expired": True,
+                "premium.expired_at": now_ist
+            }}
+        )
+        
+        # Update user object to reflect changes
+        user['premium']['is_active'] = False
+        user['premium']['expired'] = True
+        user['premium']['expired_at'] = now_ist
+        
+        print(f"User subscription expired and marked as inactive")
+        
+    return user
+
 @csrf_exempt
 def verify_token(request):
     if request.method != "GET":
@@ -214,6 +255,9 @@ def verify_token(request):
         if not user:
             return JsonResponse({"valid": False, "error": "User not found"}, status=401)
         
+        # Check if premium subscription has expired
+        user = check_subscription_expiry(user)
+        
         # Prepare user response object (exclude password)
         user_response = {
             "id": str(user["_id"]),
@@ -225,7 +269,11 @@ def verify_token(request):
             "bio": user.get("bio", ""),
             "referralCode": user.get("referralCode", ""),
             "referrals": user.get("referrals", []),
-            "referredBy": user.get("referredBy")
+            "referredBy": user.get("referredBy"),
+            "premium": user.get("premium", {
+                "is_active": False,
+                "plan": None
+            }),
         }
         
         return JsonResponse({
@@ -259,6 +307,9 @@ def user_profile(request):
         user = users_collection.find_one({"_id": ObjectId(user_id)})
         if not user:
             return JsonResponse({"error": "User not found"}, status=404)
+        
+        # Check if premium subscription has expired
+        user = check_subscription_expiry(user)
         
         # Prepare user response object (exclude password)
         user_response = {
@@ -513,39 +564,56 @@ def payment_success(request):
         
         print(f"Found user: {user['username']} ({user['email']})")  # Debug log
             
-        # Calculate expiration time
-        now = datetime.utcnow()
+        # Start with IST time directly instead of UTC
+        # Get current time in IST (UTC+5:30)
+        now_utc = datetime.utcnow()
+        now_ist = now_utc + timedelta(hours=5, minutes=30)
+        
+        print(f"Current UTC time: {now_utc}")
+        print(f"Current IST time being stored: {now_ist}")
         
         if plan == "monthly":
-            expire_time = now + timedelta(days=30)
+            # Calculate expiry in IST directly
+            expire_ist = now_ist + timedelta(days=30)
+            print(f"Subscription will expire at (IST): {expire_ist}")
+            
             premium_data = {
                 "is_active": True,
                 "plan": "monthly",
                 "payment_id": payment_id,
                 "amount": 49,
                 "currency": "INR",
-                "started_at": now,
-                "expires_at": expire_time,
+                "started_at": now_ist,  # Store IST time
+                "started_at_utc": now_utc,  # Store UTC time as reference
+                "expires_at": expire_ist,  # Store IST expiry time
+                "expires_at_utc": now_utc + timedelta(days=30),  # Store UTC expiry as reference
+                "timezone": "Asia/Kolkata",  # Store timezone info
                 "is_pro": True,
-                "is_plus": False
+                "is_plus": False,  # Monthly plan is not Plus
+                "expired": False   # Reset expired flag if present
             }
         elif plan == "yearly":
-            expire_time = now + timedelta(days=365)
+            # Calculate expiry in IST directly
+            expire_ist = now_ist + timedelta(days=365)
+            print(f"Subscription will expire at (IST): {expire_ist}")
+            
             premium_data = {
                 "is_active": True,
                 "plan": "yearly",
                 "payment_id": payment_id,
                 "amount": 499,
                 "currency": "INR", 
-                "started_at": now,
-                "expires_at": expire_time,
-                "is_pro": True,
-                "is_plus": True
+                "started_at": now_ist,  # Store IST time
+                "started_at_utc": now_utc,  # Store UTC time as reference
+                "expires_at": expire_ist,  # Store IST expiry time
+                "expires_at_utc": now_utc + timedelta(days=365),  # Store UTC expiry as reference
+                "timezone": "Asia/Kolkata",  # Store timezone info
+                "is_pro": False,   # Clear pro flag
+                "is_plus": True,   # Only set plus flag
+                "expired": False   # Reset expired flag if present
             }
         else:
             return JsonResponse({"error": "Invalid plan"}, status=400)
-        
-        print(f"Updating user {user['_id']} with premium data: {premium_data}")  # Debug log
         
         # Update user in database
         update_result = users_collection.update_one(
@@ -553,19 +621,34 @@ def payment_success(request):
             {"$set": {"premium": premium_data}}
         )
         
+        # Update JWT token to include the plan
+        new_payload = {
+            "user_id": str(user["_id"]),
+            "username": user["username"],
+            "email": user["email"],
+            "plan": plan,  # Add the plan to JWT
+            "exp": datetime.utcnow() + timedelta(days=7)
+        }
+        new_token = jwt.encode(new_payload, SECRET_KEY, algorithm="HS256")
+        
         print(f"Update result: {update_result.modified_count} documents modified")  # Debug log
         
         if update_result.modified_count == 0:
             return JsonResponse({"error": "Failed to update user premium status"}, status=500)
         
+        # In the response, include formatted dates for frontend
         return JsonResponse({
             "success": True,
             "message": f"Premium {plan} plan activated successfully",
-            "expires_at": expire_time.isoformat(),
+            "expires_at": expire_ist.isoformat(),
+            "expires_at_formatted": expire_ist.strftime("%Y-%m-%d %H:%M:%S IST"), 
+            "started_at": now_ist.isoformat(),
+            "token": new_token,
             "user": {
                 "id": str(user["_id"]),
                 "email": user["email"],
-                "username": user["username"]
+                "username": user["username"],
+                "plan": plan
             }
         })
         
@@ -575,3 +658,52 @@ def payment_success(request):
     except Exception as e:
         print(f"Payment success error: {e}")
         return JsonResponse({"error": str(e), "success": False}, status=500)
+
+# Add a new endpoint to manually check and refresh subscription status
+@csrf_exempt
+def check_subscription_status(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Only GET method is allowed."}, status=405)
+    
+    # Verify token
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return JsonResponse({"error": "No token provided"}, status=401)
+    
+    token = auth_header.split(' ')[1]
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        user_id = payload.get("user_id")
+        
+        # Find user by ID
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            return JsonResponse({"error": "User not found"}, status=404)
+        
+        # Check if premium subscription has expired
+        updated_user = check_subscription_expiry(user)
+        
+        # Get premium status
+        premium = updated_user.get('premium', {})
+        is_active = premium.get('is_active', False)
+        plan = premium.get('plan')
+        expires_at = premium.get('expires_at')
+        
+        # Format expiry date if available
+        expiry_formatted = None
+        if expires_at:
+            expiry_formatted = expires_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+            
+        return JsonResponse({
+            "is_active": is_active,
+            "plan": plan,
+            "expires_at": expiry_formatted,
+            "is_expired": premium.get('expired', False),
+            "need_renewal": is_active == False and premium.get('expired', False)
+        })
+        
+    except jwt.ExpiredSignatureError:
+        return JsonResponse({"error": "Token expired"}, status=401)
+    except (jwt.InvalidTokenError, Exception) as e:
+        return JsonResponse({"error": f"Invalid token: {str(e)}"}, status=401)

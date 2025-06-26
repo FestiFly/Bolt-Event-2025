@@ -54,8 +54,38 @@ const OnboardingPage = () => {
     return decodedToken?.plan || null;
   };
 
+  // Add this function to check subscription status directly from the backend
+  const checkSubscriptionStatus = async () => {
+    if (!isAuthenticated()) return;
+    
+    try {
+      const token = Cookies.get('jwt');
+      const response = await axios.get('http://localhost:8000/api/subscription/status/', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      console.log('Subscription status check:', response.data);
+      
+      if (response.data) {
+        // If API reports subscription as expired, update our local state
+        if (!response.data.is_active && response.data.is_expired) {
+          setUserPremiumStatus(prev => ({
+            ...prev,
+            is_active: false,
+            expired: true
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check subscription status:', error);
+    }
+  };
+
   // Add effect to check subscription status on component mount
   useEffect(() => {
+    checkSubscriptionStatus();
+    
+    // Existing code to get subscription from JWT
     const plan = getUserSubscriptionPlan();
     if (plan) {
       setUserPremiumStatus({
@@ -211,9 +241,8 @@ const OnboardingPage = () => {
           userId: userId
         };
 
-        console.log('Sending payment data to backend:', paymentData); // Debug log
+        console.log('Sending payment data to backend:', paymentData);
         
-        // Direct fetch to ensure we're using the exact URL
         fetch("http://localhost:8000/api/payment-success/", {
           method: "POST",
           headers: {
@@ -223,17 +252,24 @@ const OnboardingPage = () => {
           body: JSON.stringify(paymentData),
         })
         .then((res) => {
-          console.log('Payment response status:', res.status); // Debug response status
+          console.log('Payment response status:', res.status);
           return res.json();
         })
         .then((data) => {
-          console.log('Payment response data:', data); // Debug response data
+          console.log('Payment response data:', data);
           if (data.success) {
-            // Update local premium status immediately
+            // Update JWT token with new plan info if provided
+            if (data.token) {
+              Cookies.set('jwt', data.token, { expires: 7 });
+            }
+            
+            // Update user premium status
             setUserPremiumStatus({
               is_active: true,
-              plan: plan
+              plan: plan,
+              expires_at: data.expires_at
             });
+            
             alert(`✅ Payment successful! You are now a Premium user with ${plan} plan.`);
           } else {
             console.error('Payment verification failed:', data);
@@ -242,7 +278,7 @@ const OnboardingPage = () => {
         })
         .catch(error => {
           console.error("Payment verification error:", error);
-          alert(`There was an error confirming your payment: ${error.message}. Please contact support.`);
+          alert(`There was an error confirming your payment. Please contact support.`);
         });
       },
       prefill: {
@@ -319,6 +355,61 @@ const OnboardingPage = () => {
       return "flex-1 bg-white/5 rounded-xl p-6 border border-white/10 hover:border-purple-500/50 transition-all hover:bg-white/10 hover:scale-[1.02]";
     } else {
       return "flex-1 bg-gradient-to-b from-yellow-500/20 to-transparent rounded-xl p-6 border border-yellow-500/30 relative hover:border-yellow-400/70 transition-all hover:scale-[1.02] hover:from-yellow-500/30";
+    }
+  };
+
+  // Add this utility function near the top of your component
+  const formatDateTime = (dateString: string | null): string => {
+    if (!dateString) return 'N/A';
+    
+    try {
+      // Parse the UTC date string
+      const date = new Date(dateString);
+      
+      // Format as Indian date and time (IST)
+      return new Intl.DateTimeFormat('en-IN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Kolkata', // Indian timezone
+        timeZoneName: 'short'
+      }).format(date);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
+  };
+
+  // Add this function to display remaining time in subscription
+  const getRemainingTime = (expiryDate: string): string => {
+    if (!expiryDate) return '';
+    
+    try {
+      const expiry = new Date(expiryDate);
+      const now = new Date();
+      const diffMs = expiry.getTime() - now.getTime();
+      
+      if (diffMs <= 0) return 'Expired';
+      
+      // Calculate days, hours, minutes
+      const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      
+      if (days > 30) {
+        const months = Math.floor(days / 30);
+        return `${months} month${months > 1 ? 's' : ''} remaining`;
+      }
+      
+      if (days > 0) {
+        return `${days} day${days > 1 ? 's' : ''} ${hours} hr${hours !== 1 ? 's' : ''} remaining`;
+      }
+      
+      return `${hours} hour${hours !== 1 ? 's' : ''} remaining`;
+    } catch (error) {
+      console.error('Error calculating remaining time:', error);
+      return '';
     }
   };
 
@@ -430,6 +521,14 @@ const OnboardingPage = () => {
                     <Check size={16} className="text-green-400" />
                     <span className="text-green-300 text-sm">
                       Currently subscribed to {userPremiumStatus.plan} plan
+                      {userPremiumStatus.expires_at && (
+                        <>
+                          <span className="mx-1">•</span>
+                          <span title={formatDateTime(userPremiumStatus.expires_at)}>
+                            {getRemainingTime(userPremiumStatus.expires_at)}
+                          </span>
+                        </>
+                      )}
                     </span>
                   </div>
                 )}

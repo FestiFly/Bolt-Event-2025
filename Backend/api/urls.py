@@ -34,4 +34,5 @@ urlpatterns = [
     #test urls
     path('heygen-generate/', generate_heygen_video, name='generate_heygen_video'),
     path('payment-success/', payment_success, name='payment-success'),
+    path('subscription/status/', check_subscription_status, name='check_subscription_status'),
 ]

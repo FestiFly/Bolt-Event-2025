@@ -10,7 +10,8 @@ const getAuthToken = (): string | null => {
 };
 
 const checkPremiumStatus = (user: any) => {
-  if (!user || !user.premium) {
+  // Return a default structure if user is null or undefined
+  if (!user) {
     return {
       isActive: false,
       isPlus: false,
@@ -19,26 +20,10 @@ const checkPremiumStatus = (user: any) => {
     };
   }
 
-  try {
-    const premium = user.premium;
-    
-    if (!premium || !premium.is_active) {
-      return {
-        isActive: false,
-        isPlus: false,
-        plan: null,
-        expiresAt: null
-      };
-    }
-
-    return {
-      isActive: premium.is_active,
-      isPlus: premium.plan === 'yearly',
-      plan: premium.plan,
-      expiresAt: premium.expires_at
-    };
-  } catch (error) {
-    console.error('Error checking premium status:', error);
+  // Make sure premium exists before accessing its properties
+  const premium = user.premium || {};
+  
+  if (!premium.is_active) {
     return {
       isActive: false,
       isPlus: false,
@@ -46,6 +31,13 @@ const checkPremiumStatus = (user: any) => {
       expiresAt: null
     };
   }
+
+  return {
+    isActive: premium.is_active || false,
+    isPlus: premium.plan === 'yearly',
+    plan: premium.plan || null,
+    expiresAt: premium.expires_at || null
+  };
 };
 
 const formatExpiryDate = (expiryDate: string | null): string => {
@@ -98,6 +90,13 @@ const ProfilePage = () => {
     
     // Fetch user data from API on component mount
     fetchUserProfile();
+    
+    // Then check subscription status (after a small delay to ensure user is loaded)
+    setTimeout(() => {
+      if (user) { // Only check if user exists
+        checkSubscriptionStatus();
+      }
+    }, 500);
   }, [navigate]);
 
   const fetchUserProfile = async () => {
@@ -210,6 +209,60 @@ const ProfilePage = () => {
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 2000);
   };
+
+  // Update the checkSubscriptionStatus function with proper null checks
+  const checkSubscriptionStatus = () => {
+    const token = getAuthToken();
+    if (!token) return;
+
+    setLoading(true);
+    fetch('http://localhost:8000/api/subscription/status/', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    .then(res => res.json())
+    .then(data => {
+      console.log('Subscription status:', data);
+      
+      // If subscription has expired, update the local user object
+      if (data.is_expired && !data.is_active) {
+        setUser(prev => {
+          // Make sure prev exists before updating
+          if (!prev) return prev;
+          
+          return {
+            ...prev,
+            premium: {
+              ...(prev.premium || {}), // Use empty object as fallback if premium is null
+              is_active: false,
+              expired: true
+            }
+          };
+        });
+        
+        // If needed, show renewal notification
+        if (data.need_renewal) {
+          // Add your notification code here
+        }
+      }
+    })
+    .catch(err => {
+      console.error('Error checking subscription status:', err);
+    })
+    .finally(() => {
+      setLoading(false);
+    });
+  };
+
+  // Add another useEffect to check subscription when user changes
+  useEffect(() => {
+    // Only check if user exists
+    if (user) {
+      checkSubscriptionStatus();
+    }
+  }, [user]); // This will run when the user object is updated
 
   if (userLoading) {
     return (
