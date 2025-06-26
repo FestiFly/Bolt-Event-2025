@@ -53,6 +53,42 @@ const OnboardingPage = () => {
     }
   };
 
+  const launchRazorpayCheckout = (plan: "monthly" | "yearly") => {
+  const options = {
+    key: "rzp_test_l3O4pMfo4DDgNl", // replace with your Razorpay test key
+    amount: plan === "monthly" ? 4900 : 29900, // ₹49 or ₹299
+    currency: "INR",
+    name: "FestiFly",
+    description: `${plan === "monthly" ? "Monthly" : "Yearly"} Pro Access`,
+    handler: function (response: any) {
+      fetch("http://localhost:8000/api/payment-success/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          payment_id: response.razorpay_payment_id,
+          plan: plan,
+          email: "user@example.com" // replace with dynamic user email
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          alert("✅ Payment successful! You are now a Pro user.");
+        });
+    },
+    prefill: {
+      email: "user@example.com",
+    },
+    theme: {
+      color: "#F37254",
+    },
+  };
+
+  const razor = new (window as any).Razorpay(options);
+  razor.open();
+};
+
   return (
     <div className="min-h-screen py-12 px-4">
       <div className="max-w-2xl mx-auto">
@@ -168,8 +204,17 @@ const OnboardingPage = () => {
                   </button>
                   <button
                     onClick={() => {
-                      console.log('Premium upgrade requested');
-                      setShowPremium(false);
+                      // Check if Razorpay already exists
+                      if (typeof window.Razorpay === 'undefined') {
+                        const script = document.createElement("script");
+                        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+                        script.onload = () => {
+                          launchRazorpayCheckout("monthly");
+                        };
+                        document.body.appendChild(script);
+                      } else {
+                        launchRazorpayCheckout("monthly");
+                      }
                     }}
                     className="flex-1 px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-black rounded-lg font-semibold hover:from-yellow-600 hover:to-orange-600 transition-all"
                   >
