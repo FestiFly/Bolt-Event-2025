@@ -2,6 +2,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from rest_framework.decorators import api_view
 import json
+from rest_framework.decorators import api_view
 from pymongo import MongoClient, DESCENDING
 from bson.objectid import ObjectId
 from django.contrib.auth.hashers import make_password, check_password
@@ -432,35 +433,98 @@ def apply_referral(request):
 #=============================================================== Payments ================================================================
 
 @csrf_exempt
-@api_view(["POST"])
 def payment_success(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST method is allowed."}, status=405)
+    
     try:
         data = json.loads(request.body)
         email = data.get("email")
         plan = data.get("plan")  # "monthly" or "yearly"
+        payment_id = data.get("payment_id")
+        
+        # Try to get user ID from token first
+        user_id = None
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+            try:
+                payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+                user_id = payload.get("user_id")
+            except Exception as e:
+                print(f"Error decoding token: {e}")
+        
+        # Fallback to user_id from request if available
+        if not user_id and data.get("userId"):
+            user_id = data.get("userId")
+            
+        if not email and not user_id:
+            return JsonResponse({"error": "Missing user identification (email or userId)"}, status=400)
+        
+        if not plan:
+            return JsonResponse({"error": "Missing plan details"}, status=400)
 
-        if not email or not plan:
-            return JsonResponse({"error": "Missing email or plan"}, status=400)
-
-        user_collection = db["users"]
+        # Find user
+        query = {}
+        if user_id:
+            try:
+                query["_id"] = ObjectId(user_id)
+            except:
+                pass
+        if email:
+            query["$or"] = query.get("$or", []) + [{"email": email}]
+        
+        if not query:
+            return JsonResponse({"error": "Invalid user identification"}, status=400)
+        
+        # Find the user
+        user = users_collection.find_one(query)
+        if not user:
+            return JsonResponse({"error": "User not found"}, status=404)
+            
+        # Calculate expiration time
         now = datetime.utcnow()
-
+        
         if plan == "monthly":
-            expire_time = now.replace(microsecond=0) + timedelta(days=30)
-            update_fields = {"is_pro": True, "expire_time": expire_time}
+            expire_time = now + timedelta(days=30)
+            premium_data = {
+                "is_active": True,
+                "plan": "monthly",
+                "payment_id": payment_id,
+                "amount": 49,
+                "currency": "INR",
+                "started_at": now,
+                "expires_at": expire_time,
+                "is_pro": True,
+                "is_plus": False
+            }
         elif plan == "yearly":
-            expire_time = now.replace(microsecond=0) + timedelta(days=365)
-            update_fields = {"is_plus": True, "expire_time": expire_time}
+            expire_time = now + timedelta(days=365)
+            premium_data = {
+                "is_active": True,
+                "plan": "yearly",
+                "payment_id": payment_id,
+                "amount": 499,
+                "currency": "INR", 
+                "started_at": now,
+                "expires_at": expire_time,
+                "is_pro": True,
+                "is_plus": True
+            }
         else:
             return JsonResponse({"error": "Invalid plan"}, status=400)
-
-        user_collection.update_one(
-            {"email": email},
-            {"$set": update_fields},
-            upsert=True
+        
+        # Update user in database
+        users_collection.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"premium": premium_data}}
         )
-
-        return JsonResponse({"message": "Subscription updated."}, status=200)
-
+        
+        return JsonResponse({
+            "success": True,
+            "message": f"Premium {plan} plan activated successfully",
+            "expires_at": expire_time.isoformat()
+        })
+        
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return JsonResponse({"error": str(e), "success": False}, status=500)
