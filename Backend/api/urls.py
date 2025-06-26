@@ -28,4 +28,8 @@ urlpatterns = [
     path('user/profile/', user_profile, name='user-profile'),
     path('user/update-profile/', update_profile, name='update-profile'),
     path('user/apply-referral/', apply_referral, name='apply-referral'),
+
+
+    #test urls
+    path('heygen-generate/', generate_heygen_video, name='generate_heygen_video'),
 ]
