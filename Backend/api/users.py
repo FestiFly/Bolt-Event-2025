@@ -160,6 +160,7 @@ def user_login(request):
                 "user_id": str(user["_id"]),
                 "username": user["username"],
                 "email": user["email"],
+                "plan": user.get("premium", {}).get("plan", None),
                 "exp": datetime.utcnow() + timedelta(days=7)
             }
             token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
@@ -173,6 +174,7 @@ def user_login(request):
                 "username": user["username"],
                 "email": user["email"],
                 "name": user.get("name", ""),
+                "plan": user.get("premium", {}).get("plan", None),
                 "preferences": user.get("preferences", []),
                 "location": user.get("location", ""),
                 "bio": user.get("bio", ""),

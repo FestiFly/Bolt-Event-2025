@@ -102,7 +102,9 @@ const Navigation = () => {
     <nav style={{
       backgroundColor: "rgba(0, 0, 0, 0.2)",
       backdropFilter: "blur(16px)",
-      borderBottom: "1px solid rgba(255, 255, 255, 0.1)"
+      borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+      position: "relative", // Add position relative
+      zIndex: 1000 // Add a high z-index to ensure the navbar is above other content
     }}>
       <div style={{
         maxWidth: "80rem",
@@ -232,7 +234,7 @@ const Navigation = () => {
                 borderRadius: "0.5rem",
                 boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)",
                 border: "1px solid rgba(255, 255, 255, 0.2)",
-                zIndex: 50,
+                zIndex: 1050, // Increased z-index to be above other elements
                 animation: "dropdownFade 0.2s ease-out forwards"
               }}>
                 {isAuthenticated() ? (

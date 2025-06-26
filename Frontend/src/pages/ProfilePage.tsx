@@ -743,9 +743,32 @@ const ProfilePage = () => {
         }}>
           <Crown size={24} color="rgb(216, 180, 254)" style={{ margin: "0 auto 0.5rem" }} />
           <h4 style={{ color: "rgb(216, 180, 254)", marginBottom: "0.5rem" }}>Upgrade to Premium</h4>
-          <p style={{ color: "rgb(209, 213, 219)", fontSize: "0.875rem" }}>
+          <p style={{ color: "rgb(209, 213, 219)", fontSize: "0.875rem", marginBottom: "1rem" }}>
             Get access to exclusive features and priority support
           </p>
+          <button
+            onClick={() => {
+              // Navigate to onboarding page and open premium modal
+              navigate('/?openPremium=true');
+            }}
+            style={{
+              backgroundColor: "rgb(124, 58, 237)",
+              color: "white",
+              border: "none",
+              borderRadius: "0.375rem",
+              padding: "0.5rem 1rem",
+              fontSize: "0.875rem",
+              fontWeight: "500",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+          >
+            <Crown size={16} />
+            View Premium Plans
+          </button>
         </div>
       );
     }

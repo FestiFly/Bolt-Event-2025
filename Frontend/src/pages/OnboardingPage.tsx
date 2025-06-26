@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { MapPin, Heart, Calendar, Search, Crown, Check } from 'lucide-react';
 import Cookies from 'js-cookie';
-import axios from 'axios'; // Make sure to import axios
+import axios from 'axios';
 
 const OnboardingPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({
     location: '',
     interests: [] as string[],
@@ -13,7 +14,7 @@ const OnboardingPage = () => {
     endDate: ''
   });
   const [showPremium, setShowPremium] = useState(false);
-  const [userPremiumStatus, setUserPremiumStatus] = useState(null);
+  const [userPremiumStatus, setUserPremiumStatus] = useState<any>(null);
   const [loadingPremiumStatus, setLoadingPremiumStatus] = useState(false);
 
   const interestOptions = [
@@ -44,6 +45,36 @@ const OnboardingPage = () => {
     return !!(decodedToken && decodedToken.exp > Date.now() / 1000);
   };
 
+  // Check user's subscription plan directly from JWT
+  const getUserSubscriptionPlan = (): string | null => {
+    const token = Cookies.get('jwt');
+    if (!token) return null;
+    
+    const decodedToken = decodeJWT(token);
+    return decodedToken?.plan || null;
+  };
+
+  // Add effect to check subscription status on component mount
+  useEffect(() => {
+    const plan = getUserSubscriptionPlan();
+    if (plan) {
+      setUserPremiumStatus({
+        is_active: true,
+        plan: plan
+      });
+    }
+  }, []);
+
+  // Add this effect to check premium modal opening
+  useEffect(() => {
+    // Check if we should open premium modal from URL parameter
+    const searchParams = new URLSearchParams(location.search);
+    const openPremium = searchParams.get('openPremium');
+    if (openPremium === 'true') {
+      setShowPremium(true);
+    }
+  }, [location.search]);
+
   const handleInterestToggle = (interest: string) => {
     setFormData(prev => ({
       ...prev,
@@ -57,7 +88,7 @@ const OnboardingPage = () => {
     const payload = {
       location: formData.location,
       interests: formData.interests.map(i => i.toLowerCase()),
-      month: formData.startDate, // now directly storing month in startDate
+      month: formData.startDate,
     };
 
     try {
@@ -81,13 +112,59 @@ const OnboardingPage = () => {
 
   const handlePremiumClick = () => {
     if (!isAuthenticated()) {
-      // Redirect to login page if not authenticated
       navigate('/auth');
       return;
     }
-    // Show premium modal if authenticated
     setShowPremium(true);
   };
+
+  // Add this function to fetch premium status
+  const fetchUserPremiumStatus = async () => {
+    if (!isAuthenticated()) return;
+    
+    setLoadingPremiumStatus(true);
+    try {
+      const token = Cookies.get('jwt');
+      const response = await axios.get('http://localhost:8000/api/user/profile/', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data && response.data.premium) {
+        setUserPremiumStatus(response.data.premium);
+        console.log('User premium status updated from API:', response.data.premium);
+      } else {
+        // Fallback to JWT token plan if API doesn't return premium status
+        const planFromToken = getUserSubscriptionPlan();
+        if (planFromToken) {
+          setUserPremiumStatus({
+            is_active: true,
+            plan: planFromToken
+          });
+          console.log('User premium status set from JWT token:', planFromToken);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching premium status:', error);
+      // Fallback to JWT token plan if API call fails
+      const planFromToken = getUserSubscriptionPlan();
+      if (planFromToken) {
+        setUserPremiumStatus({
+          is_active: true,
+          plan: planFromToken
+        });
+        console.log('User premium status set from JWT token (fallback):', planFromToken);
+      }
+    } finally {
+      setLoadingPremiumStatus(false);
+    }
+  };
+
+  // Add effect to fetch premium status when showing modal
+  useEffect(() => {
+    if (showPremium) {
+      fetchUserPremiumStatus();
+    }
+  }, [showPremium]);
 
   const launchRazorpayCheckout = (plan: "monthly" | "yearly") => {
     if (!isAuthenticated()) {
@@ -147,16 +224,16 @@ const OnboardingPage = () => {
         })
         .then((res) => {
           console.log('Payment response status:', res.status); // Debug response status
-          if (!res.ok) {
-            throw new Error(`Server returned ${res.status}`);
-          }
           return res.json();
         })
         .then((data) => {
           console.log('Payment response data:', data); // Debug response data
           if (data.success) {
-            // Refresh premium status
-            fetchUserPremiumStatus();
+            // Update local premium status immediately
+            setUserPremiumStatus({
+              is_active: true,
+              plan: plan
+            });
             alert(`✅ Payment successful! You are now a Premium user with ${plan} plan.`);
           } else {
             console.error('Payment verification failed:', data);
@@ -182,6 +259,12 @@ const OnboardingPage = () => {
   };
 
   const handleSubscribeClick = (plan: "monthly" | "yearly") => {
+    // Check if user already has this plan
+    if (userPremiumStatus?.is_active && userPremiumStatus?.plan === plan) {
+      alert(`You are already subscribed to the ${plan} plan!`);
+      return;
+    }
+
     // Final authentication check before payment
     if (!isAuthenticated()) {
       alert("Please log in to subscribe to premium plans");
@@ -201,34 +284,43 @@ const OnboardingPage = () => {
     }
   };
 
-  // Add this function to fetch premium status
-  const fetchUserPremiumStatus = async () => {
-    if (!isAuthenticated()) return;
+  // Utility functions to check subscription status
+  const isPlanActive = (plan: "monthly" | "yearly"): boolean => {
+    return userPremiumStatus?.is_active && userPremiumStatus?.plan === plan;
+  };
+
+  const getButtonText = (plan: "monthly" | "yearly"): string => {
+    if (loadingPremiumStatus) return "Loading...";
+    if (isPlanActive(plan)) return "✓ Subscribed";
+    if (userPremiumStatus?.is_active && userPremiumStatus?.plan !== plan) {
+      return `Switch to ${plan === 'monthly' ? 'Monthly' : 'Yearly'}`;
+    }
+    return `Subscribe ${plan === 'monthly' ? 'Monthly' : 'Yearly'}`;
+  };
+
+  const getButtonStyle = (plan: "monthly" | "yearly") => {
+    if (isPlanActive(plan)) {
+      return "w-full py-3 bg-green-600 text-white rounded-lg font-semibold cursor-default";
+    }
     
-    setLoadingPremiumStatus(true);
-    try {
-      const token = Cookies.get('jwt');
-      const response = await axios.get('http://localhost:8000/api/user/profile/', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      if (response.data && response.data.premium) {
-        setUserPremiumStatus(response.data.premium);
-        console.log('User premium status updated:', response.data.premium);
-      }
-    } catch (error) {
-      console.error('Error fetching premium status:', error);
-    } finally {
-      setLoadingPremiumStatus(false);
+    if (plan === "monthly") {
+      return "w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl";
+    } else {
+      return "w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-black rounded-lg font-semibold hover:from-yellow-600 hover:to-orange-600 transition-all shadow-lg hover:shadow-xl";
     }
   };
 
-  // Add effect to fetch premium status when showing modal
-  useEffect(() => {
-    if (showPremium) {
-      fetchUserPremiumStatus();
+  const getPlanCardStyle = (plan: "monthly" | "yearly") => {
+    if (isPlanActive(plan)) {
+      return "flex-1 rounded-xl p-6 border bg-green-500/20 border-green-500/50";
     }
-  }, [showPremium]);
+    
+    if (plan === "monthly") {
+      return "flex-1 bg-white/5 rounded-xl p-6 border border-white/10 hover:border-purple-500/50 transition-all hover:bg-white/10 hover:scale-[1.02]";
+    } else {
+      return "flex-1 bg-gradient-to-b from-yellow-500/20 to-transparent rounded-xl p-6 border border-yellow-500/30 relative hover:border-yellow-400/70 transition-all hover:scale-[1.02] hover:from-yellow-500/30";
+    }
+  };
 
   return (
     <div className="min-h-screen py-12 px-4">
@@ -330,14 +422,27 @@ const OnboardingPage = () => {
               <div className="text-center mb-6">
                 <Crown className="h-16 w-16 text-yellow-400 mx-auto mb-4" />
                 <h3 className="text-2xl font-bold text-white mb-2">Upgrade Your Festival Experience</h3>
-                <p className="text-gray-300 mb-6">Choose the plan that fits your festival lifestyle</p>
+                <p className="text-gray-300">Choose the plan that fits your festival lifestyle</p>
+                
+                {/* Show current subscription status */}
+                {userPremiumStatus?.is_active && (
+                  <div className="inline-flex items-center gap-2 bg-green-500/20 border border-green-500/30 rounded-lg px-4 py-2 mt-4">
+                    <Check size={16} className="text-green-400" />
+                    <span className="text-green-300 text-sm">
+                      Currently subscribed to {userPremiumStatus.plan} plan
+                    </span>
+                  </div>
+                )}
               </div>
               
               <div className="flex flex-col md:flex-row gap-6">
                 {/* Monthly Plan */}
-                <div className="flex-1 bg-white/5 rounded-xl p-6 border border-white/10 hover:border-purple-500/50 transition-all hover:bg-white/10 hover:scale-[1.02]">
+                <div className={getPlanCardStyle("monthly")}>
                   <div className="text-center mb-4">
-                    <h4 className="text-xl font-bold text-white mb-1">Monthly Plan</h4>
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <h4 className="text-xl font-bold text-white">Monthly Plan</h4>
+                      {isPlanActive('monthly') && <Check size={20} className="text-green-400" />}
+                    </div>
                     <div className="inline-flex items-center gap-1 mb-4">
                       <span className="text-3xl font-bold text-white">₹49</span>
                       <span className="text-gray-400">/month</span>
@@ -380,20 +485,26 @@ const OnboardingPage = () => {
                   
                   <button
                     onClick={() => handleSubscribeClick("monthly")}
-                    className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
+                    disabled={loadingPremiumStatus || isPlanActive('monthly')}
+                    className={getButtonStyle('monthly')}
                   >
-                    Subscribe Monthly
+                    {getButtonText('monthly')}
                   </button>
                 </div>
                 
                 {/* Yearly Plan */}
-                <div className="flex-1 bg-gradient-to-b from-yellow-500/20 to-transparent rounded-xl p-6 border border-yellow-500/30 relative hover:border-yellow-400/70 transition-all hover:scale-[1.02] hover:from-yellow-500/30">
-                  <div className="absolute -top-3 right-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-black text-xs font-bold py-1 px-4 rounded-full">
-                    BEST VALUE • Save 50%
-                  </div>
+                <div className={getPlanCardStyle("yearly")}>
+                  {!isPlanActive('yearly') && (
+                    <div className="absolute -top-3 right-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-black text-xs font-bold py-1 px-4 rounded-full">
+                      BEST VALUE • Save 50%
+                    </div>
+                  )}
                   
                   <div className="text-center mb-4">
-                    <h4 className="text-xl font-bold text-white mb-1">Yearly Plan</h4>
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <h4 className="text-xl font-bold text-white">Yearly Plan</h4>
+                      {isPlanActive('yearly') && <Check size={20} className="text-green-400" />}
+                    </div>
                     <div className="inline-flex items-center gap-1 mb-1">
                       <span className="text-3xl font-bold text-white">₹499</span>
                       <span className="text-gray-400">/year</span>
@@ -443,9 +554,10 @@ const OnboardingPage = () => {
                   
                   <button
                     onClick={() => handleSubscribeClick("yearly")}
-                    className="w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-black rounded-lg font-semibold hover:from-yellow-600 hover:to-orange-600 transition-all shadow-lg hover:shadow-xl"
+                    disabled={loadingPremiumStatus || isPlanActive('yearly')}
+                    className={getButtonStyle('yearly')}
                   >
-                    Subscribe Yearly
+                    {getButtonText('yearly')}
                   </button>
                 </div>
               </div>
