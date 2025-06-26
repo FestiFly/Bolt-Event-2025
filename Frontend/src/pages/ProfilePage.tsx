@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Edit2, Save, X, Camera, Loader, MapPin, Heart, Users, Link as LinkIcon, Copy, Check, AlertCircle } from 'lucide-react';
+import { User, Mail, Edit2, Save, X, Camera, Loader, MapPin, Heart, Users, Link as LinkIcon, Copy, Check, AlertCircle, Crown } from 'lucide-react';
 import axios from 'axios';
+import { checkPremiumStatus, formatExpiryDate } from '/utils/premium';
 
 // Auth utility function
 const getCurrentUser = (): any => {
@@ -32,6 +33,8 @@ const ProfilePage = () => {
     'Music', 'Food', 'Art', 'Technology', 'Culture', 'Comedy',
     'Film', 'Literature', 'Sports', 'Gaming', 'Wellness', 'Dance'
   ];
+
+  const premiumStatus = checkPremiumStatus();
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -299,6 +302,8 @@ const ProfilePage = () => {
           </div>
         </div>
       </div>
+
+      {renderPremiumStatus()}
     </div>
   );
   
@@ -830,6 +835,102 @@ const ProfilePage = () => {
       </div>
     </div>
   );
+
+  const renderPremiumStatus = () => {
+    if (!premiumStatus.isActive) {
+      return (
+        <div style={{
+          marginTop: "1.5rem",
+          padding: "1rem",
+          backgroundColor: "rgba(255, 255, 255, 0.05)",
+          borderRadius: "0.5rem",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+        }}>
+          <h3 style={{
+            color: "white",
+            fontSize: "1rem",
+            fontWeight: "500",
+            marginBottom: "0.5rem"
+          }}>
+            Premium Status
+          </h3>
+          <p style={{ color: "rgb(209, 213, 219)" }}>
+            You are currently on the <span style={{ color: "white" }}>Free Plan</span>
+          </p>
+          <button
+            onClick={() => navigate('/')} 
+            style={{
+              marginTop: "0.5rem",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.5rem 1rem",
+              backgroundColor: "rgba(124, 58, 237, 0.3)",
+              color: "rgb(216, 180, 254)",
+              borderRadius: "0.375rem",
+              border: "1px solid rgba(139, 92, 246, 0.3)",
+              cursor: "pointer"
+            }}
+          >
+            <Crown size={16} />
+            <span>Upgrade to Premium</span>
+          </button>
+        </div>
+      );
+    }
+    
+    return (
+      <div style={{
+        marginTop: "1.5rem",
+        padding: "1rem",
+        backgroundColor: premiumStatus.isPlus ? 
+          "rgba(234, 179, 8, 0.1)" : 
+          "rgba(124, 58, 237, 0.1)",
+        borderRadius: "0.5rem",
+        border: `1px solid ${premiumStatus.isPlus ? 
+          "rgba(234, 179, 8, 0.3)" : 
+          "rgba(124, 58, 237, 0.3)"}`
+      }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          marginBottom: "0.5rem"
+        }}>
+          <Crown 
+            size={20} 
+            style={{ 
+              color: premiumStatus.isPlus ? "rgb(250, 204, 21)" : "rgb(167, 139, 250)" 
+            }} 
+          />
+          <h3 style={{
+            color: "white",
+            fontSize: "1rem",
+            fontWeight: "500"
+          }}>
+            {premiumStatus.isPlus ? "Premium Plus" : "Premium"} Plan
+          </h3>
+        </div>
+        
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.5rem"
+        }}>
+          <p style={{ color: "rgb(209, 213, 219)" }}>
+            Plan: <span style={{ color: "white" }}>
+              {premiumStatus.plan === "yearly" ? "Yearly" : "Monthly"}
+            </span>
+          </p>
+          <p style={{ color: "rgb(209, 213, 219)" }}>
+            Expires: <span style={{ color: "white" }}>
+              {formatExpiryDate(premiumStatus.expiresAt)}
+            </span>
+          </p>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div style={{
