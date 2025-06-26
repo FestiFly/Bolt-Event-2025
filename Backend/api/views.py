@@ -13,6 +13,7 @@ import copy
 from pymongo.errors import PyMongoError
 import google.generativeai as genai
 from bson.objectid import ObjectId
+import time 
 from duckduckgo_search import DDGS
 from bs4 import BeautifulSoup
 import time
@@ -22,6 +23,7 @@ import random
 client = MongoClient('mongodb+srv://ihub:akash@ihub.fel24ru.mongodb.net/')
 db = client['festifly']
 festival_collection = db['festivals']
+
 
 # -------------------------------------------------- Utilities -------------------------------------------------
 # Set up Reddit API client
@@ -34,6 +36,8 @@ reddit = praw.Reddit(
 # Gemini setup
 genai.configure(api_key="AIzaSyBcfcI8WFa798JtYaPpvxR94AYPz3LiVPM    ")
 model = genai.GenerativeModel("gemini-2.0-flash")
+
+HEYGEN_API_KEY = "NWM0NzA2YTgxY2Q3NDgwM2JkYjIzZDBkMGYyNjk0NjgtMTc1MDkyMDY1OA=="
 
 # Connect to MongoDB
 client = MongoClient('mongodb+srv://ihub:akash@ihub.fel24ru.mongodb.net/')
@@ -1280,6 +1284,7 @@ def generate_ai_video(request):
     try:
         import base64
 
+        # Parse JSON body
         data = json.loads(request.body)
         festival_id = data.get("_id")
         language = data.get("language", "en").lower()
@@ -1339,17 +1344,15 @@ def generate_ai_video(request):
             }
         }
 
-        # res = requests.post(tavus_url, headers=headers, json=payload)
-        # if res.status_code != 200:
-        #     return JsonResponse({"error": "Tavus video generation failed", "details": res.text}, status=500)
-
-        # tavus_data = res.json()
-        # video_url = tavus_data.get("video_url") or tavus_data.get("url") or "PENDING"
-
-        # ⚠️ MOCK MODE ENABLED — Tavus API temporarily skipped
-        video_url = "https://dl2.hotshare.click/Eleven_2025_Original_360p_HD.mp4"  # Placeholder public video
-
-        print("⚠️ Mock video used — Tavus API was not called due to network/access issue.")
+        try:
+            res = requests.post(tavus_url, headers=headers, json=payload, timeout=70)
+            if res.status_code == 200:
+                tavus_data = res.json()
+                video_url = tavus_data.get("video_url") or tavus_data.get("url") or "PENDING"
+            else:
+                return JsonResponse({"error": "Tavus video generation failed", "details": res.text}, status=500)
+        except requests.exceptions.RequestException as e:
+            return JsonResponse({"error": "Tavus API connection error", "details": str(e)}, status=500)
 
         # Save in MongoDB
         festival_collection.update_one(
@@ -1369,6 +1372,7 @@ def generate_ai_video(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+    
 
 def process_with_gemini_ai(raw_event_data, location, month, interests):
     """
@@ -1573,3 +1577,68 @@ def enhance_festival_ai(request):
         return JsonResponse({"error": f"Server error: {str(e)}"}, status=500)
 
 
+@csrf_exempt
+def generate_heygen_video(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST request required."}, status=400)
+
+    data = json.loads(request.body.decode("utf-8"))
+    doc_id = data.get("_id")
+    if not doc_id:
+        return JsonResponse({"error": "_id is required"}, status=400)
+
+    doc = festival_collection.find_one({"_id": ObjectId(doc_id)})
+    if not doc or "ai_voice_script_en" not in doc:
+        return JsonResponse({"error": "Document or ai_voice_script_en not found"}, status=404)
+
+    input_text = doc["ai_voice_script_en"]
+    avatar_id = data.get("avatar_id", "Adriana_Business_Front_2_public")
+    voice_id = data.get("voice_id", "9ff7fd2dd9114c3bae005e62aa485e52")
+    # input_text = data.get("input_text", "Hello, this is a test from Heygen!")
+
+    # Step 1: Generate video
+    url = "https://api.heygen.com/v2/video/generate"
+    payload = {
+        "video_inputs": [
+            {
+                "avatar_id": avatar_id,
+                "voice": {
+                    "type": "text",
+                    "voice_id": voice_id,
+                    "input_text": input_text
+                },
+                "style": "TalkingHead"
+            }
+        ],
+        "caption": False,
+        "dimension": {"width": 1280, "height": 720}
+    }
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "x-api-key": HEYGEN_API_KEY
+    }
+    response = requests.post(url, json=payload, headers=headers)
+    result = response.json()
+    video_id = result.get("data", {}).get("video_id")
+    if not video_id:
+        return JsonResponse({"error": "Failed to generate video", "details": result}, status=500)
+
+    # Step 2: Poll for video status
+    status_url = "https://api.heygen.com/v1/video_status.get"
+    status_headers = {
+        "accept": "application/json",
+        "x-api-key": HEYGEN_API_KEY
+    }
+    max_attempts = 20
+    for _ in range(max_attempts):
+        status_response = requests.get(status_url, headers=status_headers, params={"video_id": video_id})
+        status_data = status_response.json()
+        video_status = status_data.get("data", {}).get("status")
+        if video_status == "completed":
+            return JsonResponse(status_data)
+        elif video_status == "failed":
+            return JsonResponse({"error": "Video generation failed", "details": status_data}, status=500)
+        time.sleep(5)  # Wait before polling again
+
+    return JsonResponse({"error": "Video generation timed out", "video_id": video_id}, status=202)
