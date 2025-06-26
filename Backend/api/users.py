@@ -269,7 +269,14 @@ def user_profile(request):
             "bio": user.get("bio", ""),
             "referralCode": user.get("referralCode", generate_referral_code()),
             "referrals": user.get("referrals", []),
-            "referredBy": user.get("referredBy")
+            "referredBy": user.get("referredBy"),
+            "premium": user.get("premium", {
+                "is_active": False,
+                "plan": None,
+                "expires_at": None
+            }),
+            "created_at": user.get("created_at"),
+            "last_login": user.get("last_login")
         }
         
         # If user doesn't have a referral code yet, generate and save one

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Heart, Calendar, Search, Crown } from 'lucide-react';
+import Cookies from 'js-cookie';
 
 const OnboardingPage = () => {
   const navigate = useNavigate();
@@ -17,6 +18,29 @@ const OnboardingPage = () => {
     'Film', 'Literature', 'Sports', 'Gaming', 'Wellness', 'Dance'
   ];
 
+  // Decode JWT token to check authentication
+  const decodeJWT = (token: string) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      return null;
+    }
+  };
+
+  // Check if user is authenticated using JWT token
+  const isAuthenticated = (): boolean => {
+    const token = Cookies.get('jwt');
+    if (!token) return false;
+    
+    const decodedToken = decodeJWT(token);
+    return !!(decodedToken && decodedToken.exp > Date.now() / 1000);
+  };
+
   const handleInterestToggle = (interest: string) => {
     setFormData(prev => ({
       ...prev,
@@ -27,7 +51,6 @@ const OnboardingPage = () => {
   };
 
   const handleFindFestivals = async () => {
-
     const payload = {
       location: formData.location,
       interests: formData.interests.map(i => i.toLowerCase()),
@@ -53,7 +76,24 @@ const OnboardingPage = () => {
     }
   };
 
+  const handlePremiumClick = () => {
+    if (!isAuthenticated()) {
+      // Redirect to login page if not authenticated
+      navigate('/auth');
+      return;
+    }
+    // Show premium modal if authenticated
+    setShowPremium(true);
+  };
+
   const launchRazorpayCheckout = (plan: "monthly" | "yearly") => {
+    // Double check authentication before proceeding to payment
+    if (!isAuthenticated()) {
+      alert("Please log in to subscribe to premium plans");
+      navigate('/auth');
+      return;
+    }
+
     // Get user data from localStorage
     const userJson = localStorage.getItem('festifly_user');
     let userEmail = "user@example.com";
@@ -68,10 +108,10 @@ const OnboardingPage = () => {
         userId = userData.id || "";
       } catch (error) {
         console.error("Error parsing user data:", error);
+        alert("Error loading user data. Please try logging in again.");
+        navigate('/auth');
+        return;
       }
-    } else {
-      alert("Please log in to subscribe to premium plans");
-      return;
     }
 
     const options = {
@@ -134,6 +174,26 @@ const OnboardingPage = () => {
 
     const razor = new (window as any).Razorpay(options);
     razor.open();
+  };
+
+  const handleSubscribeClick = (plan: "monthly" | "yearly") => {
+    // Final authentication check before payment
+    if (!isAuthenticated()) {
+      alert("Please log in to subscribe to premium plans");
+      navigate('/auth');
+      return;
+    }
+
+    if (typeof (window as any).Razorpay === 'undefined') {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => {
+        launchRazorpayCheckout(plan);
+      };
+      document.body.appendChild(script);
+    } else {
+      launchRazorpayCheckout(plan);
+    }
   };
 
   return (
@@ -220,11 +280,11 @@ const OnboardingPage = () => {
               </button>
 
               <button
-                onClick={() => setShowPremium(true)}
+                onClick={handlePremiumClick}
                 className="flex items-center justify-center space-x-2 px-6 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-black rounded-lg font-semibold hover:from-yellow-600 hover:to-orange-600 transition-all shadow-lg hover:shadow-xl"
               >
                 <Crown className="h-5 w-5" />
-                <span>Premium Plan</span>
+                <span>{isAuthenticated() ? 'Premium Plan' : 'Login for Premium'}</span>
               </button>
             </div>
           </div>
@@ -285,18 +345,7 @@ const OnboardingPage = () => {
                   </ul>
                   
                   <button
-                    onClick={() => {
-                      if (typeof (window as any).Razorpay === 'undefined') {
-                        const script = document.createElement("script");
-                        script.src = "https://checkout.razorpay.com/v1/checkout.js";
-                        script.onload = () => {
-                          launchRazorpayCheckout("monthly");
-                        };
-                        document.body.appendChild(script);
-                      } else {
-                        launchRazorpayCheckout("monthly");
-                      }
-                    }}
+                    onClick={() => handleSubscribeClick("monthly")}
                     className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
                   >
                     Subscribe Monthly
@@ -359,18 +408,7 @@ const OnboardingPage = () => {
                   </ul>
                   
                   <button
-                    onClick={() => {
-                      if (typeof (window as any).Razorpay === 'undefined') {
-                        const script = document.createElement("script");
-                        script.src = "https://checkout.razorpay.com/v1/checkout.js";
-                        script.onload = () => {
-                          launchRazorpayCheckout("yearly");
-                        };
-                        document.body.appendChild(script);
-                      } else {
-                        launchRazorpayCheckout("yearly");
-                      }
-                    }}
+                    onClick={() => handleSubscribeClick("yearly")}
                     className="w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-black rounded-lg font-semibold hover:from-yellow-600 hover:to-orange-600 transition-all shadow-lg hover:shadow-xl"
                   >
                     Subscribe Yearly

@@ -1,30 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Shield, UserPlus, UserCheck, Mail, Lock, User, Tag, AlertCircle, Loader, Link as LinkIcon } from 'lucide-react';
+import { Shield, UserPlus, UserCheck, Mail, Lock, User, AlertCircle, Loader, Link as LinkIcon } from 'lucide-react';
 import axios from 'axios';
-import Cookies from 'js-cookie'; // Import js-cookie
+import Cookies from 'js-cookie';
 
-// Inline authentication utility functions
+// Inline authentication utility functions - SIMPLIFIED
 const AUTH_TOKEN_KEY = 'jwt';
-const USER_KEY = 'festifly_user';
 const API_URL = 'http://localhost:8000/api';
 
-// Function to store auth data in cookies and limited user info in localStorage
-const storeAuthData = (token: string, user: any): void => {
-  Cookies.set(AUTH_TOKEN_KEY, token, { expires: 7 }); // Store token in cookie for 7 days
-
-  // Store only name and email in localStorage
-  const userData = {
-    name: user.name,
-    email: user.email
-  };
-  localStorage.setItem(USER_KEY, JSON.stringify(userData));
+// Function to store only JWT token in cookies
+const storeAuthData = (token: string): void => {
+  // Store only token in cookie with proper settings
+  Cookies.set(AUTH_TOKEN_KEY, token, { 
+    expires: 7,
+    secure: false, // Set to true in production with HTTPS
+    sameSite: 'lax'
+  });
 };
 
 // Function to clear auth data
 const clearAuthData = (): void => {
   Cookies.remove(AUTH_TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+  // Clean up any legacy localStorage items
+  localStorage.removeItem('festifly_user');
+  localStorage.removeItem('festifly_token');
 };
 
 // Function to check if user is authenticated
@@ -32,17 +31,16 @@ const isAuthenticated = (): boolean => {
   return !!Cookies.get(AUTH_TOKEN_KEY);
 };
 
-// Function to get current user's name and email
-const getCurrentUser = (): any => {
-  const userJson = localStorage.getItem(USER_KEY);
-  return userJson ? JSON.parse(userJson) : null;
+// Function to get JWT token
+const getAuthToken = (): string | null => {
+  return Cookies.get(AUTH_TOKEN_KEY) || null;
 };
 
 // Function to setup axios interceptors
 const setupAxiosInterceptors = (): void => {
   axios.interceptors.request.use(
     (config) => {
-      const token = Cookies.get(AUTH_TOKEN_KEY);
+      const token = getAuthToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -57,7 +55,6 @@ const setupAxiosInterceptors = (): void => {
 const AuthPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  // Check if we should show signup initially based on location state
   const [isLogin, setIsLogin] = useState<boolean>(!(location.state as any)?.signup);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +73,7 @@ const AuthPage: React.FC = () => {
     confirmPassword: '',
     name: '',
     preferences: [] as string[],
-    referralCode: '' // Add this line
+    referralCode: ''
   });
 
   // Setup axios interceptors on component mount
@@ -87,26 +84,9 @@ const AuthPage: React.FC = () => {
   // Check if user is already logged in
   useEffect(() => {
     if (isAuthenticated()) {
-      // Verify token validity
-      const verifyToken = async () => {
-        try {
-          const response = await axios.get(`${API_URL}/auth/verify/`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem(AUTH_TOKEN_KEY)}` }
-          });
-          
-          if (response.data.valid) {
-            navigate('/discover'); // Redirect to main app page
-          }
-        } catch (error) {
-          // Token is invalid, let user log in again
-          clearAuthData();
-        }
-      };
-      
-      verifyToken();
+      navigate('/discover');
     }
     
-    // Set sign up or login based on URL state
     if ((location.state as any)?.signup) {
       setIsLogin(false);
     }
@@ -121,13 +101,13 @@ const AuthPage: React.FC = () => {
     try {
       const response = await axios.post(`${API_URL}/user/login/`, loginData);
       
-      // Store token and user info
-      storeAuthData(response.data.token, response.data.user);
+      // Store only JWT token
+      storeAuthData(response.data.token);
       
       setMessage('Login successful! Redirecting...');
       setTimeout(() => {
-        window.location.reload(); // Reload to update nav/profile button
         navigate('/discover');
+        window.location.reload(); // Reload to update nav/profile button
       }, 1000);
       
     } catch (error: any) {
@@ -143,7 +123,6 @@ const AuthPage: React.FC = () => {
     setError(null);
     setMessage(null);
     
-    // Validate password match
     if (signupData.password !== signupData.confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -161,13 +140,13 @@ const AuthPage: React.FC = () => {
         referralCode: signupData.referralCode
       });
       
-      // Store token and user info
-      storeAuthData(response.data.token, response.data.user);
+      // Store only JWT token
+      storeAuthData(response.data.token);
       
       setMessage('Account created successfully! Redirecting...');
       setTimeout(() => {
-        window.location.reload(); // Reload to update nav/profile button
         navigate('/discover');
+        window.location.reload(); // Reload to update nav/profile button
       }, 1000);
       
     } catch (error: any) {
@@ -189,22 +168,6 @@ const AuthPage: React.FC = () => {
     setSignupData({
       ...signupData,
       [e.target.name]: e.target.value
-    });
-  };
-
-  const addPreference = (preference: string) => {
-    if (preference && !signupData.preferences.includes(preference)) {
-      setSignupData({
-        ...signupData,
-        preferences: [...signupData.preferences, preference]
-      });
-    }
-  };
-
-  const removePreference = (preference: string) => {
-    setSignupData({
-      ...signupData,
-      preferences: signupData.preferences.filter(p => p !== preference)
     });
   };
 
@@ -289,11 +252,10 @@ const AuthPage: React.FC = () => {
             <form onSubmit={handleLoginSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
               <div>
                 <label htmlFor="email" style={{
-                  display: "block",
+                  display: "flex",
                   color: "white",
                   fontWeight: "500",
                   marginBottom: "0.5rem",
-                  display: "flex",
                   alignItems: "center",
                   gap: "0.5rem"
                 }}>
@@ -322,11 +284,10 @@ const AuthPage: React.FC = () => {
 
               <div>
                 <label htmlFor="password" style={{
-                  display: "block",
+                  display: "flex",
                   color: "white",
                   fontWeight: "500",
                   marginBottom: "0.5rem",
-                  display: "flex",
                   alignItems: "center",
                   gap: "0.5rem"
                 }}>
@@ -403,16 +364,16 @@ const AuthPage: React.FC = () => {
               </div>
             </form>
           ) : (
-            /* Signup Form */
+            /* Signup Form - keeping same structure */
             <form onSubmit={handleSignupSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              {/* Keep all existing signup form fields */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                 <div>
                   <label htmlFor="username" style={{
-                    display: "block",
+                    display: "flex",
                     color: "white",
                     fontWeight: "500",
                     marginBottom: "0.5rem",
-                    display: "flex",
                     alignItems: "center",
                     gap: "0.5rem"
                   }}>
@@ -441,11 +402,10 @@ const AuthPage: React.FC = () => {
 
                 <div>
                   <label htmlFor="name" style={{
-                    display: "block",
+                    display: "flex",
                     color: "white",
                     fontWeight: "500",
                     marginBottom: "0.5rem",
-                    display: "flex",
                     alignItems: "center",
                     gap: "0.5rem"
                   }}>
@@ -474,11 +434,10 @@ const AuthPage: React.FC = () => {
 
               <div>
                 <label htmlFor="signup-email" style={{
-                  display: "block",
+                  display: "flex",
                   color: "white",
                   fontWeight: "500",
                   marginBottom: "0.5rem",
-                  display: "flex",
                   alignItems: "center",
                   gap: "0.5rem"
                 }}>
@@ -508,11 +467,10 @@ const AuthPage: React.FC = () => {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                 <div>
                   <label htmlFor="signup-password" style={{
-                    display: "block",
+                    display: "flex",
                     color: "white",
                     fontWeight: "500",
                     marginBottom: "0.5rem",
-                    display: "flex",
                     alignItems: "center",
                     gap: "0.5rem"
                   }}>
@@ -541,11 +499,10 @@ const AuthPage: React.FC = () => {
 
                 <div>
                   <label htmlFor="confirmPassword" style={{
-                    display: "block",
+                    display: "flex",
                     color: "white",
                     fontWeight: "500",
                     marginBottom: "0.5rem",
-                    display: "flex",
                     alignItems: "center",
                     gap: "0.5rem"
                   }}>
@@ -574,15 +531,11 @@ const AuthPage: React.FC = () => {
               </div>
 
               <div>
-              </div>
-
-              <div>
                 <label style={{
-                  display: "block",
+                  display: "flex",
                   color: "white",
                   fontWeight: "500",
                   marginBottom: "0.5rem",
-                  display: "flex",
                   alignItems: "center",
                   gap: "0.5rem"
                 }}>
@@ -661,18 +614,10 @@ const AuthPage: React.FC = () => {
         </div>
       </div>
       
-      {/* This adds the keyframe animation for the spinner inline */}
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes spin {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
-        }
-        .animate-spin {
-          animation: spin 1s linear infinite;
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}} />
     </div>

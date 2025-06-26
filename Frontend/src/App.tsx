@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
+import Cookies from 'js-cookie';
 import Navigation from './components/Navigation';
 import OnboardingPage from './pages/OnboardingPage';
 import DiscoveryPage from './pages/DiscoveryPage';
@@ -10,16 +11,31 @@ import AuthPage from './pages/UserLogin';
 import ProfilePage from './pages/ProfilePage';
 import BoltBadge from './components/BoltBadge';
 
-// Auth utility functions
-const AUTH_TOKEN_KEY = 'festifly_token';
-const USER_KEY = 'festifly_user';
+// JWT utility functions
+const decodeJWT = (token: string) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('Error decoding JWT:', error);
+    return null;
+  }
+};
 
 const isAuthenticated = (): boolean => {
-  return !!localStorage.getItem(AUTH_TOKEN_KEY);
+  const token = Cookies.get('jwt');
+  if (!token) return false;
+  
+  const decodedToken = decodeJWT(token);
+  return !!(decodedToken && decodedToken.exp > Date.now() / 1000);
 };
 
 const getToken = (): string | null => {
-  return localStorage.getItem(AUTH_TOKEN_KEY);
+  return Cookies.get('jwt');
 };
 
 const setupAxiosInterceptors = (): void => {
@@ -42,8 +58,9 @@ const setupAxiosInterceptors = (): void => {
     (error) => {
       if (error.response && error.response.status === 401) {
         // Unauthorized - clear token and redirect to login
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
+        Cookies.remove('jwt');
+        localStorage.removeItem('festifly_token'); // Clean up legacy
+        localStorage.removeItem('festifly_user'); // Clean up legacy
         window.location.href = '/auth';
       }
       return Promise.reject(error);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Music, Calendar, Settings, Home, User, LogOut, ChevronDown, UserCircle, UserPlus } from 'lucide-react';
+import Cookies from 'js-cookie';
 
 const Navigation = () => {
   const location = useLocation();
@@ -11,14 +12,37 @@ const Navigation = () => {
   
   const isActive = (path: string) => location.pathname === path;
 
-  // Check authentication status and get current user
+  // Decode JWT token to get user data
+  const decodeJWT = (token: string) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      console.error('Error decoding JWT:', error);
+      return null;
+    }
+  };
+
+  // Check authentication status and get current user from JWT
   useEffect(() => {
-    const userJson = localStorage.getItem('festifly_user');
-    if (userJson) {
-      try {
-        setUser(JSON.parse(userJson));
-      } catch (e) {
-        setUser(null);
+    const token = Cookies.get('jwt');
+    if (token) {
+      const decodedToken = decodeJWT(token);
+      if (decodedToken && decodedToken.exp > Date.now() / 1000) {
+        setUser({
+          id: decodedToken.user_id,
+          username: decodedToken.username,
+          email: decodedToken.email,
+          // Use username as fallback for name if not available
+          name: decodedToken.name || decodedToken.username
+        });
+      } else {
+        // Token expired, clear it
+        handleLogout();
       }
     } else {
       setUser(null);
@@ -40,16 +64,38 @@ const Navigation = () => {
   }, []);
 
   const isAuthenticated = (): boolean => {
-    return !!localStorage.getItem('festifly_token');
+    const token = Cookies.get('jwt');
+    if (!token) return false;
+    
+    const decodedToken = decodeJWT(token);
+    return !!(decodedToken && decodedToken.exp > Date.now() / 1000);
   };
 
-  // Handle logout
+  // Complete logout function - clears everything
   const handleLogout = () => {
+    // Clear all cookies
+    Cookies.remove('jwt');
+    Cookies.remove('festifly_token'); // Clean up legacy
+    
+    // Clear all localStorage items (clean up legacy)
     localStorage.removeItem('festifly_token');
     localStorage.removeItem('festifly_user');
+    localStorage.removeItem('jwt');
+    
+    // Clear sessionStorage as well
+    sessionStorage.clear();
+    
+    // Reset user state
+    setUser(null);
     setIsDropdownOpen(false);
+    
+    // Navigate to home
     navigate('/');
-    window.location.reload(); // Refresh to update state
+    
+    // Force page reload to ensure all state is cleared
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   };
   
   return (
@@ -196,7 +242,7 @@ const Navigation = () => {
                       borderBottom: "1px solid rgba(255, 255, 255, 0.1)"
                     }}>
                       <p style={{ fontSize: "0.875rem", fontWeight: "500", color: "white" }}>
-                        {user?.name || user?.username}
+                        {user?.name || user?.username || "User"}
                       </p>
                       <p style={{
                         fontSize: "0.75rem",
@@ -205,7 +251,7 @@ const Navigation = () => {
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap"
                       }}>
-                        {user?.email}
+                        {user?.email || ""}
                       </p>
                     </div>
                     <Link 
