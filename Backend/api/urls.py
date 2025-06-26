@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import *
 from .organizer import *
-
+from .users import *
 urlpatterns = [
     path('recommendations/', get_recommendations, name='get_recommendations'),
     path("festival-detail/", get_festival_by_id, name="get_festival_by_id"),
@@ -14,4 +14,13 @@ urlpatterns = [
     #organizer urls
     path('organizer/signup/', organizer_signup, name='organizer-signup'), 
     path('organizer/login/', organizer_login, name='organizer-login'),
+
+
+    #user urls
+    path('user/signup/', user_signup, name='user-signup'),
+    path('user/login/', user_login, name='user-login'),
+    path('user/verify/', verify_token, name='user-verify'),
+    path('user/profile/', user_profile, name='user-profile'),
+    path('user/update-profile/', update_profile, name='update-profile'),
+    path('user/apply-referral/', apply_referral, name='apply-referral'),
 ]
