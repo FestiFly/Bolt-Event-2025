@@ -1571,3 +1571,5 @@ def enhance_festival_ai(request):
         
     except Exception as e:
         return JsonResponse({"error": f"Server error: {str(e)}"}, status=500)
+
+
