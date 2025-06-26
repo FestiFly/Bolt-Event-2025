@@ -58,65 +58,53 @@ const OrganizerPanel = () => {
     }
   };
 
-  const fetchFestivals = async () => {
-    // TODO: Connect to backend API
-    console.log('Fetching festivals for organizer panel');
-    
-    // Mock data
-    const mockFestivals: Festival[] = [
-      {
-        id: '1',
-        name: 'Electric Dreams Festival',
-        location: 'Austin, TX',
-        subreddit: 'r/electronicmusic',
-        tags: ['Music', 'Technology', 'Art'],
-        dateAdded: '2024-01-15',
-        status: 'active'
-      },
-      {
-        id: '2',
-        name: 'Sunset Food & Music Fest',
-        location: 'San Diego, CA',
-        subreddit: 'r/sandiego',
-        tags: ['Food', 'Music', 'Culture'],
-        dateAdded: '2024-01-20',
-        status: 'active'
-      },
-      {
-        id: '3',
-        name: 'Comedy Central Live',
-        location: 'Chicago, IL',
-        subreddit: 'r/standupcomedy',
-        tags: ['Comedy', 'Entertainment'],
-        dateAdded: '2024-01-25',
-        status: 'pending'
-      }
-    ];
-    
-    setFestivals(mockFestivals);
-  };
-
-  const handleAddFestival = async () => {
-    // TODO: Connect to backend API
-    const festival: Festival = {
-      id: Date.now().toString(),
-      ...newFestival,
-      dateAdded: new Date().toISOString().split('T')[0],
-      status: 'pending'
-    };
-    
-    setFestivals(prev => [festival, ...prev]);
-    setNewFestival({ name: '', location: '', subreddit: '', tags: [] });
-    setShowAddForm(false);
-    console.log('Festival added:', festival);
-  };
-
-  const handleDeleteFestival = (id: string) => {
-    if (confirm('Are you sure you want to delete this festival?')) {
-      setFestivals(prev => prev.filter(f => f.id !== id));
-      console.log('Festival deleted:', id);
+    const fetchFestivals = async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/organizer/festivals/');
+      const data = await response.json();
+      setFestivals(data.festivals.map((f: any) => ({
+        id: f._id,
+        name: f.name,
+        location: f.location,
+        subreddit: f.subreddit,
+        tags: f.tags,
+        status: f.status,
+        dateAdded: new Date(f.dateAdded).toISOString().split("T")[0]
+      })));
+    } catch (err) {
+      console.error("Failed to fetch:", err);
     }
   };
+
+
+    const handleAddFestival = async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/organizer/festival/create/', {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newFestival),
+      });
+      if (response.ok) {
+        fetchFestivals();
+        setNewFestival({ name: '', location: '', subreddit: '', tags: [] });
+        setShowAddForm(false);
+      } else {
+        alert("Failed to add festival.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+
+    const handleDeleteFestival = async (id: string) => {
+    if (!confirm("Are you sure you want to delete?")) return;
+    await fetch(`http://127.0.0.1:8000/api/organizer/festival/${id}/delete/`, {
+      method: "DELETE"
+    });
+    fetchFestivals();
+  };
+
 
   const handleTagAdd = (tag: string) => {
     if (tag && !newFestival.tags.includes(tag)) {

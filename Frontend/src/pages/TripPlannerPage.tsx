@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, ExternalLink, Video, Mic, Plus, Clock, Star, Share, Heart, ThumbsUp, Loader, MessageCircle, TrendingUp, Play, Pause, Volume2, Download, CheckCircle, Globe, Headphones } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, ExternalLink, Video, Mic, Plus, Clock, Star, Share, Heart, ThumbsUp, Loader, MessageCircle, TrendingUp, Play, Pause, Volume2, Download, CheckCircle, Globe, Headphones, Navigation, Compass, Route, Car, Plane, Train, Film, Maximize, Minimize, RotateCcw } from 'lucide-react';
 
 interface FestivalDetail {
   _id: string;
@@ -39,12 +39,16 @@ const TripPlannerPage = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [calendarAdded, setCalendarAdded] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
-  const [voiceLang, setVoiceLang] = useState("en"); // default language
-  
-  // Use useRef for audio element
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const [voiceLang, setVoiceLang] = useState("en");
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoScript, setVideoScript] = useState<string | null>(null);
+  const [loadingVideo, setLoadingVideo] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const [isVideoFullscreen, setIsVideoFullscreen] = useState(false);
 
-  // Language options with flags and names
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
   const languageOptions = [
     { code: 'en', name: 'English', flag: '🇺🇸', accent: 'American' },
     { code: 'ta', name: 'Tamil', flag: '🇮🇳', accent: 'Indian' },
@@ -58,7 +62,6 @@ const TripPlannerPage = () => {
     fetchFestivalDetails();
   }, [festivalId]);
 
-  // Clean up audio when component unmounts or modal closes
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -106,7 +109,7 @@ const TripPlannerPage = () => {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         setFestival(data.festival);
       } else {
@@ -115,8 +118,7 @@ const TripPlannerPage = () => {
     } catch (error) {
       console.error('Error fetching festival details:', error);
       setError('Failed to connect to server');
-      
-      // Fallback to mock data for development
+
       setTimeout(() => {
         const mockFestival: FestivalDetail = {
           _id: festivalId!,
@@ -130,7 +132,7 @@ const TripPlannerPage = () => {
           content: "Hi all! I'm the owner of Astronox, a music and arts festival taking place Oct 17-21 at Valkyrie Ranch in Paige, TX. I've decided to share my budget publicly because I think this is very important to help the community understand just what it takes to make these things possible. Please let me know if you have any questions and I'll be happy to answer them! Hopefully this helps people understand what it takes to make these events possible. Astronox.net",
           fetched_at: "2025-06-17T06:12:16.835"
         };
-        
+
         setFestival(mockFestival);
         setError(null);
       }, 1000);
@@ -204,12 +206,11 @@ const TripPlannerPage = () => {
 
   const generateGoogleCalendarLink = () => {
     if (!festival) return '';
-    
+
     const festivalName = encodeURIComponent(festival.title);
     const festivalLocation = encodeURIComponent(festival.location);
     const festivalDescription = encodeURIComponent(festival.content || 'Discover this amazing festival experience...');
 
-    // Assuming the festival is a single-day event in the specified month 2024
     const festivalDate = new Date(`${festival.month} 1, 2024`).toISOString().replace(/[-:]/g, '').replace('Z', '');
     const startDate = festivalDate.substring(0, 8) + 'T000000';
     const endDate = festivalDate.substring(0, 8) + 'T235959';
@@ -225,14 +226,78 @@ const TripPlannerPage = () => {
     }, 2000);
   };
 
-  const handlePlayVideo = () => {
+  const handlePlayVideo = async () => {
+    if (!festival) return;
+
     setShowVideoModal(true);
+    setLoadingVideo(true);
+    setVideoScript(null);
+    setVideoUrl(null);
+    setVideoError(null);
+
+    try {
+      const response = await fetch("http://localhost:8000/api/generate-ai-video/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _id: festival._id, language: voiceLang })
+      });
+
+      const data = await response.json();
+      console.log('Video API Response:', data);
+      
+      if (response.ok) {
+        if (data.video_url) {
+          setVideoUrl(data.video_url);
+          setVideoScript(data.script || null);
+          setVideoError(null);
+        } else {
+          setVideoError('Video URL not provided in response');
+        }
+      } else {
+        console.error("Video Generation Error:", data.error || "Invalid video response");
+        setVideoError(data.error || 'Failed to generate AI video');
+      }
+    } catch (error) {
+      console.error("Failed to fetch AI video:", error);
+      setVideoError('Network error occurred while generating video');
+    } finally {
+      setLoadingVideo(false);
+    }
+  };
+
+  const closeVideoModal = () => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+    setShowVideoModal(false);
+    setVideoUrl(null);
+    setVideoScript(null);
+    setVideoError(null);
+    setIsVideoFullscreen(false);
+  };
+
+  const toggleVideoFullscreen = () => {
+    setIsVideoFullscreen(!isVideoFullscreen);
+  };
+
+  const regenerateVideo = () => {
+    handlePlayVideo();
+  };
+
+  const base64ToBlobUrl = (base64: string): string => {
+    const byteCharacters = atob(base64);
+    const byteArrays = new Uint8Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteArrays[i] = byteCharacters.charCodeAt(i);
+    }
+    const blob = new Blob([byteArrays], { type: "audio/mpeg" });
+    return URL.createObjectURL(blob);
   };
 
   const handleVoiceAssistant = async () => {
     if (!festival) return;
-    
-    // Reset states when opening modal
+
     setShowVoiceModal(true);
     setLoadingVoice(true);
     setVoiceScript(null);
@@ -248,8 +313,8 @@ const TripPlannerPage = () => {
       });
 
       const data = await response.json();
-      console.log('Voice API Response:', data); // Debug log
-      
+      console.log("Voice API Response:", data);
+
       if (response.ok && data.script) {
         setVoiceScript(data.script);
         setVoiceError(null);
@@ -257,25 +322,16 @@ const TripPlannerPage = () => {
         if (data.audio_url) {
           setAudioUrl(`http://localhost:8000${data.audio_url}`);
         } else if (data.audio_blob) {
-          // Convert base64 to Blob URL
-          const byteCharacters = atob(data.audio_blob);
-          const byteArrays = [];
-
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteArrays.push(byteCharacters.charCodeAt(i));
-          }
-
-          const blob = new Blob([new Uint8Array(byteArrays)], { type: 'audio/mpeg' });
-          const blobUrl = URL.createObjectURL(blob);
+          const blobUrl = base64ToBlobUrl(data.audio_blob);
           setAudioUrl(blobUrl);
         }
       } else {
-        console.error("Voice Assistant Error:", data.error || 'Invalid response format');
-        setVoiceError(data.error || 'Failed to generate voice briefing');
+        console.error("Voice Assistant Error:", data.error || "Invalid response format");
+        setVoiceError(data.error || "Failed to generate voice briefing");
       }
     } catch (err) {
       console.error("Voice Assistant Failed:", err);
-      setVoiceError('Network error occurred while generating voice briefing');
+      setVoiceError("Network error occurred while generating voice briefing");
     } finally {
       setLoadingVoice(false);
     }
@@ -299,11 +355,10 @@ const TripPlannerPage = () => {
     }
   };
 
-  // Handle audio events
   const handleAudioEvents = () => {
     if (audioRef.current) {
       const audio = audioRef.current;
-      
+
       const handlePlay = () => setIsPlaying(true);
       const handlePause = () => setIsPlaying(false);
       const handleEnded = () => setIsPlaying(false);
@@ -317,7 +372,6 @@ const TripPlannerPage = () => {
       audio.addEventListener('ended', handleEnded);
       audio.addEventListener('error', handleError);
 
-      // Cleanup function
       return () => {
         audio.removeEventListener('play', handlePlay);
         audio.removeEventListener('pause', handlePause);
@@ -327,7 +381,6 @@ const TripPlannerPage = () => {
     }
   };
 
-  // Effect to handle audio events when audioUrl changes
   useEffect(() => {
     if (audioUrl && audioRef.current) {
       const cleanup = handleAudioEvents();
@@ -336,7 +389,6 @@ const TripPlannerPage = () => {
   }, [audioUrl]);
 
   const closeVoiceModal = () => {
-    // Clean up audio when closing modal
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
@@ -350,6 +402,16 @@ const TripPlannerPage = () => {
 
   const getSelectedLanguage = () => {
     return languageOptions.find(lang => lang.code === voiceLang) || languageOptions[0];
+  };
+
+  const getGoogleMapsEmbedUrl = (location: string) => {
+    const encodedLocation = encodeURIComponent(location);
+    return `https://www.google.com/maps/embed/v1/place?key=YOUR_API_KEY&q=${encodedLocation}&zoom=12`;
+  };
+
+  const getGoogleMapsDirectionsUrl = (location: string) => {
+    const encodedLocation = encodeURIComponent(location);
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodedLocation}`;
   };
 
   if (loading) {
@@ -398,7 +460,6 @@ const TripPlannerPage = () => {
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="flex items-center mb-8">
           <button
             onClick={() => navigate('/discover')}
@@ -410,9 +471,7 @@ const TripPlannerPage = () => {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Hero Section */}
             <div className="relative rounded-2xl overflow-hidden group">
               <img
                 src={getRandomImage()}
@@ -449,7 +508,6 @@ const TripPlannerPage = () => {
               </div>
             </div>
 
-            {/* Description */}
             <div className={`bg-white/10 backdrop-blur-lg rounded-2xl p-6 border-2 ${getVibeColor(festival.vibe_score)} hover:bg-white/15 transition-all duration-300`}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold text-white">About This Festival</h2>
@@ -458,11 +516,11 @@ const TripPlannerPage = () => {
                   <span className="text-sm text-gray-300 font-medium">{getVibeLabel(festival.vibe_score)}</span>
                 </div>
               </div>
-              
+
               <p className="text-gray-300 leading-relaxed mb-6 text-lg">
                 {festival.content || 'Discover this amazing festival experience...'}
               </p>
-              
+
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-white mb-3 flex items-center space-x-2">
@@ -484,7 +542,7 @@ const TripPlannerPage = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-white mb-3 flex items-center space-x-2">
                     <TrendingUp className="h-5 w-5 text-purple-400" />
@@ -505,7 +563,6 @@ const TripPlannerPage = () => {
               </div>
             </div>
 
-            {/* Community Engagement */}
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300">
               <h2 className="text-2xl font-bold text-white mb-4 flex items-center space-x-2">
                 <MessageCircle className="h-6 w-6 text-orange-400" />
@@ -515,7 +572,7 @@ const TripPlannerPage = () => {
                 <div className="flex items-center space-x-6">
                   <div className="flex items-center space-x-2 p-3 bg-orange-600/20 rounded-lg border border-orange-400/30">
                     <ThumbsUp className="h-5 w-5 text-orange-400" />
-                    <span className="text-white font-semibold">{festival.upvotes.toLocaleString()} upvotes</span>
+                    <span className="text-white font-semibold">{festival.upvotes?.toLocaleString() || '0'} upvotes</span>
                   </div>
                   <div className="flex items-center space-x-2 p-3 bg-blue-600/20 rounded-lg border border-blue-400/30">
                     <Clock className="h-5 w-5 text-blue-400" />
@@ -535,7 +592,6 @@ const TripPlannerPage = () => {
                 </a>
               </div>
 
-              {/* Reddit Reviews Button */}
               <button
                 onClick={handleFetchRedditReviews}
                 disabled={loadingReviews}
@@ -555,7 +611,6 @@ const TripPlannerPage = () => {
               </button>
             </div>
 
-            {/* Reddit Reviews Section */}
             {showReviews && reviews.length > 0 && (
               <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 animate-fadeIn">
                 <div className="flex items-center justify-between mb-6">
@@ -595,7 +650,7 @@ const TripPlannerPage = () => {
                           <span>Source</span>
                         </a>
                       </div>
-                      
+
                       <p className="text-gray-300 leading-relaxed text-sm">
                         "{review.comment}"
                       </p>
@@ -616,12 +671,10 @@ const TripPlannerPage = () => {
             )}
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Action Buttons */}
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 space-y-4 hover:bg-white/15 transition-all duration-300">
               <h3 className="text-lg font-semibold text-white mb-4 text-center">Festival Actions</h3>
-              
+
               <button
                 onClick={handleAddToCalendar}
                 className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
@@ -657,7 +710,50 @@ const TripPlannerPage = () => {
               </a>
             </div>
 
-            {/* Quick Stats */}
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
+                <Navigation className="h-5 w-5 text-green-400" />
+                <span>Location & Navigation</span>
+              </h3>
+
+              <div className="bg-gray-800/50 rounded-lg mb-4 h-48 flex items-center justify-center border border-gray-600/30 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-blue-600/20"></div>
+                <div className="text-center z-10">
+                  <MapPin className="h-12 w-12 text-green-400 mx-auto mb-2 animate-pulse" />
+                  <p className="text-white font-medium">{festival.location}</p>
+                  <p className="text-gray-300 text-sm">Interactive Map</p>
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent group-hover:from-black/40 transition-all"></div>
+              </div>
+
+              <div className="space-y-3">
+                <a
+                  href={getGoogleMapsDirectionsUrl(festival.location)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center space-x-2 bg-green-600/20 text-green-200 border border-green-400/30 py-2 rounded-lg hover:bg-green-600/30 transition-all hover:scale-105"
+                >
+                  <Route className="h-4 w-4" />
+                  <span>Get Directions</span>
+                </a>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <button className="flex flex-col items-center space-y-1 p-3 bg-blue-600/20 text-blue-200 border border-blue-400/30 rounded-lg hover:bg-blue-600/30 transition-all hover:scale-105">
+                    <Car className="h-4 w-4" />
+                    <span className="text-xs">Drive</span>
+                  </button>
+                  <button className="flex flex-col items-center space-y-1 p-3 bg-purple-600/20 text-purple-200 border border-purple-400/30 rounded-lg hover:bg-purple-600/30 transition-all hover:scale-105">
+                    <Plane className="h-4 w-4" />
+                    <span className="text-xs">Fly</span>
+                  </button>
+                  <button className="flex flex-col items-center space-y-1 p-3 bg-orange-600/20 text-orange-200 border border-orange-400/30 rounded-lg hover:bg-orange-600/30 transition-all hover:scale-105">
+                    <Train className="h-4 w-4" />
+                    <span className="text-xs">Train</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
                 <Star className="h-5 w-5 text-yellow-400" />
@@ -672,7 +768,7 @@ const TripPlannerPage = () => {
                 </div>
                 <div className="flex items-center justify-between p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
                   <span className="text-gray-300">Upvotes</span>
-                  <span className="text-white font-medium">{festival.upvotes.toLocaleString()}</span>
+                  <span className="text-white font-medium">{festival.upvotes?.toLocaleString() || '0'}</span>
                 </div>
                 <div className="flex items-center justify-between p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
                   <span className="text-gray-300">Tags</span>
@@ -693,10 +789,38 @@ const TripPlannerPage = () => {
                 )}
               </div>
             </div>
+
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
+                <Compass className="h-5 w-5 text-cyan-400" />
+                <span>Festival Tips</span>
+              </h3>
+              <div className="space-y-3">
+                <div className="p-3 bg-cyan-600/20 rounded-lg border border-cyan-400/30">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <span className="text-cyan-400 text-sm font-medium">🌤️ Weather</span>
+                  </div>
+                  <p className="text-cyan-200 text-sm">Check weather forecast for {festival.month} in {festival.location}</p>
+                </div>
+
+                <div className="p-3 bg-yellow-600/20 rounded-lg border border-yellow-400/30">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <span className="text-yellow-400 text-sm font-medium">🎫 Tickets</span>
+                  </div>
+                  <p className="text-yellow-200 text-sm">Book early for better prices and availability</p>
+                </div>
+
+                <div className="p-3 bg-pink-600/20 rounded-lg border border-pink-400/30">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <span className="text-pink-400 text-sm font-medium">🏨 Accommodation</span>
+                  </div>
+                  <p className="text-pink-200 text-sm">Reserve nearby hotels or camping spots in advance</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Enhanced Calendar Modal */}
         {showCalendarModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-md w-full border border-white/20 transform animate-scale-in">
@@ -747,32 +871,122 @@ const TripPlannerPage = () => {
           </div>
         )}
 
-        {/* Enhanced Video Modal */}
         {showVideoModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-2xl w-full border border-white/20 transform animate-scale-in">
-              <div className="text-center">
-                <Video className="h-16 w-16 text-red-400 mx-auto mb-4 animate-pulse" />
-                <h3 className="text-2xl font-bold text-white mb-4">AI Festival Preview</h3>
-                <div className="bg-black/50 rounded-lg aspect-video mb-6 flex items-center justify-center border border-red-400/30">
-                  <div className="text-center">
-                    <Play className="h-12 w-12 text-red-400 mx-auto mb-2" />
-                    <p className="text-gray-300">Tavus AI video player will be embedded here</p>
-                    <p className="text-gray-400 text-sm mt-2">Experience the festival through AI-generated content</p>
+          <div className={`fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 ${isVideoFullscreen ? 'bg-black/90' : ''}`}>
+            <div className={`bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 transform animate-scale-in ${isVideoFullscreen ? 'max-w-6xl w-full h-full max-h-screen' : 'max-w-4xl w-full'}`}>
+              <div className="text-center h-full flex flex-col">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <Film className="h-8 w-8 text-red-400 animate-pulse" />
+                    <div className="text-left">
+                      <h3 className="text-2xl font-bold text-white">AI Festival Preview</h3>
+                      <p className="text-red-200 text-sm">Powered by Tavus AI</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    {videoUrl && !loadingVideo && (
+                      <button
+                        onClick={toggleVideoFullscreen}
+                        className="p-2 bg-red-600/20 text-red-200 border border-red-400/30 rounded-lg hover:bg-red-600/30 transition-colors"
+                        title={isVideoFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                      >
+                        {isVideoFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+                      </button>
+                    )}
+                    
+                    {!loadingVideo && (
+                      <button
+                        onClick={regenerateVideo}
+                        className="p-2 bg-blue-600/20 text-blue-200 border border-blue-400/30 rounded-lg hover:bg-blue-600/30 transition-colors"
+                        title="Regenerate Video"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowVideoModal(false)}
-                  className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all transform hover:scale-105"
-                >
-                  Close
-                </button>
+
+                {loadingVideo ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <Loader className="h-12 w-12 text-red-400 animate-spin mx-auto mb-4" />
+                      <p className="text-red-200 text-lg mb-2">Generating AI video...</p>
+                      <div className="flex items-center justify-center space-x-2 text-gray-300 text-sm">
+                        <Film className="h-4 w-4" />
+                        <span>This may take a few moments</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : videoError ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="bg-red-600/20 rounded-lg p-8 border border-red-400/30 max-w-md">
+                      <div className="text-center">
+                        <Video className="h-12 w-12 text-red-400 mx-auto mb-4" />
+                        <h4 className="text-red-200 font-semibold mb-2">Video Generation Failed</h4>
+                        <p className="text-red-300 text-sm mb-4">❌ {videoError}</p>
+                        <button
+                          onClick={regenerateVideo}
+                          className="px-4 py-2 bg-red-600/50 text-red-200 rounded-lg hover:bg-red-600 transition-colors text-sm flex items-center space-x-2 mx-auto"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          <span>Try Again</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : videoUrl ? (
+                  <div className="flex-1 flex flex-col">
+                    <div className={`rounded-lg overflow-hidden border border-red-400/30 bg-black ${isVideoFullscreen ? 'flex-1' : 'aspect-video'} mb-4`}>
+                      <video 
+                        ref={videoRef}
+                        controls 
+                        className="w-full h-full rounded-lg"
+                        poster={getRandomImage()}
+                      >
+                        <source src={videoUrl} type="video/mp4" />
+                        Your browser does not support the video tag.
+                      </video>
+                    </div>
+                    
+                    {videoScript && !isVideoFullscreen && (
+                      <div className="bg-red-600/10 text-left text-sm text-red-200 p-4 rounded-lg border border-red-400/20 max-h-48 overflow-y-auto">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-red-300 font-semibold flex items-center space-x-2">
+                            <span>📜</span>
+                            <span>AI Script</span>
+                          </h4>
+                          <span className="text-red-300 text-xs bg-red-600/20 px-2 py-1 rounded">
+                            {videoScript.length} characters
+                          </span>
+                        </div>
+                        <p className="whitespace-pre-line leading-relaxed">{videoScript}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <Video className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-300 text-lg">⚠️ Video not available yet</p>
+                      <p className="text-gray-400 text-sm mt-2">Click "Try Again" to regenerate</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={closeVideoModal}
+                    className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all transform hover:scale-105 flex items-center justify-center space-x-2"
+                  >
+                    <span>Close</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Enhanced Voice Modal with Language Selection */}
         {showVoiceModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-2xl w-full border border-white/20 transform animate-scale-in">
@@ -785,13 +999,12 @@ const TripPlannerPage = () => {
                   </div>
                 </div>
 
-                {/* Language Selection */}
                 <div className="bg-blue-600/10 rounded-lg p-4 mb-6 border border-blue-400/20">
                   <div className="flex items-center justify-center space-x-2 mb-4">
                     <Globe className="h-5 w-5 text-blue-400" />
                     <h4 className="text-blue-200 font-semibold">Select Language</h4>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {languageOptions.map((lang) => (
                       <button
@@ -814,7 +1027,7 @@ const TripPlannerPage = () => {
                       </button>
                     ))}
                   </div>
-                  
+
                   <div className="mt-3 text-center">
                     <p className="text-blue-300 text-xs">
                       Selected: {getSelectedLanguage().flag} {getSelectedLanguage().name} ({getSelectedLanguage().accent})
@@ -835,7 +1048,6 @@ const TripPlannerPage = () => {
                   </div>
                 ) : (
                   <>
-                    {/* Error State */}
                     {voiceError && (
                       <div className="bg-red-600/20 rounded-lg p-6 mb-6 border border-red-400/30">
                         <p className="text-red-200 text-sm">❌ {voiceError}</p>
@@ -848,7 +1060,6 @@ const TripPlannerPage = () => {
                       </div>
                     )}
 
-                    {/* Audio Player Section */}
                     {audioUrl && !voiceError && (
                       <div className="bg-blue-600/20 rounded-lg p-6 mb-6 border border-blue-400/30">
                         <div className="flex items-center justify-center space-x-4 mb-4">
@@ -862,14 +1073,14 @@ const TripPlannerPage = () => {
                               <Play className="h-6 w-6 text-white" />
                             )}
                           </button>
-                          
+
                           <div className="flex items-center space-x-2">
                             <Volume2 className="h-5 w-5 text-blue-400" />
                             <span className="text-blue-200 text-sm font-medium">
                               {getSelectedLanguage().flag} {getSelectedLanguage().name}
                             </span>
                           </div>
-                          
+
                           <a
                             href={audioUrl}
                             download={`festival-briefing-${festival._id}-${voiceLang}.mp3`}
@@ -879,15 +1090,14 @@ const TripPlannerPage = () => {
                             <Download className="h-4 w-4 text-white" />
                           </a>
                         </div>
-                        
-                        {/* Hidden Audio Element */}
+
                         <audio
                           ref={audioRef}
                           src={audioUrl}
                           preload="auto"
                           style={{ display: 'none' }}
                         />
-                        
+
                         <div className="mt-3 text-center">
                           <p className="text-blue-200 text-sm">
                             🎧 AI-generated festival briefing ready!
@@ -899,7 +1109,6 @@ const TripPlannerPage = () => {
                       </div>
                     )}
 
-                    {/* Script Display Section */}
                     {voiceScript && !voiceError && (
                       <div className="bg-blue-600/10 rounded-lg p-4 mb-6 border border-blue-400/20 max-h-64 overflow-y-auto">
                         <div className="flex items-center justify-between mb-3">
@@ -917,7 +1126,6 @@ const TripPlannerPage = () => {
                       </div>
                     )}
 
-                    {/* No Content State */}
                     {!audioUrl && !voiceScript && !loadingVoice && !voiceError && (
                       <div className="bg-gray-600/20 rounded-lg p-6 mb-6 border border-gray-400/30">
                         <div className="text-center">
@@ -934,7 +1142,6 @@ const TripPlannerPage = () => {
                   </>
                 )}
 
-                {/* Action Buttons */}
                 <div className="flex gap-3">
                   {!loadingVoice && (
                     <button
@@ -963,34 +1170,34 @@ const TripPlannerPage = () => {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        
+
         @keyframes scale-in {
           from { opacity: 0; transform: scale(0.9); }
           to { opacity: 1; transform: scale(1); }
         }
-        
+
         .animate-fadeIn {
           animation: fadeIn 0.5s ease-out;
         }
-        
+
         .animate-scale-in {
           animation: scale-in 0.3s ease-out;
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar-track {
           background: rgba(255, 255, 255, 0.1);
           border-radius: 3px;
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar-thumb {
           background: rgba(147, 51, 234, 0.5);
           border-radius: 3px;
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: rgba(147, 51, 234, 0.7);
         }
