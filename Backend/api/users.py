@@ -449,21 +449,24 @@ def payment_success(request):
         email = data.get("email")
         plan = data.get("plan")  # "monthly" or "yearly"
         payment_id = data.get("payment_id")
+        user_id = data.get("userId")  # Get userId from request body
+        
+        print(f"Payment success data: {data}")  # Debug log
         
         # Try to get user ID from token first
-        user_id = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header.startswith('Bearer '):
             token = auth_header.split(' ')[1]
             try:
                 payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-                user_id = payload.get("user_id")
+                token_user_id = payload.get("user_id")
+                if token_user_id:
+                    user_id = token_user_id  # Prefer token user_id over request body
+                print(f"Token user_id: {token_user_id}")  # Debug log
             except Exception as e:
                 print(f"Error decoding token: {e}")
         
-        # Fallback to user_id from request if available
-        if not user_id and data.get("userId"):
-            user_id = data.get("userId")
+        print(f"Final user_id: {user_id}, email: {email}")  # Debug log
             
         if not email and not user_id:
             return JsonResponse({"error": "Missing user identification (email or userId)"}, status=400)
@@ -471,23 +474,42 @@ def payment_success(request):
         if not plan:
             return JsonResponse({"error": "Missing plan details"}, status=400)
 
-        # Find user
-        query = {}
+        # Build query to find user
+        query_conditions = []
+        
+        # Add user_id condition if available
         if user_id:
             try:
-                query["_id"] = ObjectId(user_id)
-            except:
-                pass
-        if email:
-            query["$or"] = query.get("$or", []) + [{"email": email}]
+                query_conditions.append({"_id": ObjectId(user_id)})
+            except Exception as e:
+                print(f"Invalid ObjectId: {user_id}, error: {e}")
         
-        if not query:
-            return JsonResponse({"error": "Invalid user identification"}, status=400)
+        # Add email condition if available
+        if email:
+            query_conditions.append({"email": email})
+        
+        if not query_conditions:
+            return JsonResponse({"error": "No valid user identification provided"}, status=400)
+        
+        # Use $or to find user by either condition
+        query = {"$or": query_conditions} if len(query_conditions) > 1 else query_conditions[0]
+        
+        print(f"MongoDB query: {query}")  # Debug log
         
         # Find the user
         user = users_collection.find_one(query)
         if not user:
-            return JsonResponse({"error": "User not found"}, status=404)
+            print(f"User not found with query: {query}")  # Debug log
+            
+            # Try to find user by email only as fallback
+            if email:
+                user = users_collection.find_one({"email": email})
+                print(f"Fallback email search result: {user is not None}")
+            
+            if not user:
+                return JsonResponse({"error": "User not found"}, status=404)
+        
+        print(f"Found user: {user['username']} ({user['email']})")  # Debug log
             
         # Calculate expiration time
         now = datetime.utcnow()
@@ -521,17 +543,33 @@ def payment_success(request):
         else:
             return JsonResponse({"error": "Invalid plan"}, status=400)
         
+        print(f"Updating user {user['_id']} with premium data: {premium_data}")  # Debug log
+        
         # Update user in database
-        users_collection.update_one(
+        update_result = users_collection.update_one(
             {"_id": user["_id"]},
             {"$set": {"premium": premium_data}}
         )
         
+        print(f"Update result: {update_result.modified_count} documents modified")  # Debug log
+        
+        if update_result.modified_count == 0:
+            return JsonResponse({"error": "Failed to update user premium status"}, status=500)
+        
         return JsonResponse({
             "success": True,
             "message": f"Premium {plan} plan activated successfully",
-            "expires_at": expire_time.isoformat()
+            "expires_at": expire_time.isoformat(),
+            "user": {
+                "id": str(user["_id"]),
+                "email": user["email"],
+                "username": user["username"]
+            }
         })
         
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {e}")
+        return JsonResponse({"error": "Invalid JSON data", "success": False}, status=400)
     except Exception as e:
+        print(f"Payment success error: {e}")
         return JsonResponse({"error": str(e), "success": False}, status=500)

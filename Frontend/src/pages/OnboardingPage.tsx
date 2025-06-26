@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Heart, Calendar, Search, Crown } from 'lucide-react';
+import { MapPin, Heart, Calendar, Search, Crown, Check } from 'lucide-react';
 import Cookies from 'js-cookie';
+import axios from 'axios'; // Make sure to import axios
 
 const OnboardingPage = () => {
   const navigate = useNavigate();
@@ -12,6 +13,8 @@ const OnboardingPage = () => {
     endDate: ''
   });
   const [showPremium, setShowPremium] = useState(false);
+  const [userPremiumStatus, setUserPremiumStatus] = useState(null);
+  const [loadingPremiumStatus, setLoadingPremiumStatus] = useState(false);
 
   const interestOptions = [
     'Music', 'Food', 'Art', 'Technology', 'Culture', 'Comedy',
@@ -87,88 +90,90 @@ const OnboardingPage = () => {
   };
 
   const launchRazorpayCheckout = (plan: "monthly" | "yearly") => {
-    // Double check authentication before proceeding to payment
     if (!isAuthenticated()) {
       alert("Please log in to subscribe to premium plans");
       navigate('/auth');
       return;
     }
 
-    // Get user data from localStorage
-    const userJson = localStorage.getItem('festifly_user');
-    let userEmail = "user@example.com";
+    // Get user data from JWT token
+    const token = Cookies.get('jwt');
+    const decodedToken = decodeJWT(token!);
+    
+    let userEmail = "";
     let userName = "";
     let userId = "";
     
-    if (userJson) {
-      try {
-        const userData = JSON.parse(userJson);
-        userEmail = userData.email || userEmail;
-        userName = userData.name || userData.username || "";
-        userId = userData.id || "";
-      } catch (error) {
-        console.error("Error parsing user data:", error);
-        alert("Error loading user data. Please try logging in again.");
-        navigate('/auth');
-        return;
-      }
+    if (decodedToken) {
+      userEmail = decodedToken.email || "";
+      userName = decodedToken.username || "";
+      userId = decodedToken.user_id || "";
+    }
+
+    console.log('Payment data:', { userEmail, userName, userId, plan }); // Debug log
+
+    if (!userId) {
+      alert("Could not identify user. Please try logging in again.");
+      navigate('/auth');
+      return;
     }
 
     const options = {
-      key: "rzp_test_l3O4pMfo4DDgNl", // replace with your Razorpay test key
-      amount: plan === "monthly" ? 4900 : 49900, // ₹49 or ₹499
+      key: "rzp_test_l3O4pMfo4DDgNl",
+      amount: plan === "monthly" ? 4900 : 49900,
       currency: "INR",
       name: "FestiFly",
       description: `${plan === "monthly" ? "Monthly" : "Yearly"} Premium Access`,
       handler: function (response: any) {
-        // Get auth token if available
-        const token = localStorage.getItem('festifly_token');
+        const authToken = Cookies.get('jwt');
         
+        const paymentData = {
+          payment_id: response.razorpay_payment_id,
+          plan: plan,
+          email: userEmail,
+          userId: userId
+        };
+
+        console.log('Sending payment data to backend:', paymentData); // Debug log
+        
+        // Direct fetch to ensure we're using the exact URL
         fetch("http://localhost:8000/api/payment-success/", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": token ? `Bearer ${token}` : ''
+            "Authorization": `Bearer ${authToken || ''}`
           },
-          body: JSON.stringify({
-            payment_id: response.razorpay_payment_id,
-            plan: plan,
-            email: userEmail,
-            userId: userId
-          }),
+          body: JSON.stringify(paymentData),
         })
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.success) {
-              // Update user data in localStorage with premium info
-              if (userJson) {
-                const userData = JSON.parse(userJson);
-                userData.premium = {
-                  is_active: true,
-                  plan: plan,
-                  started_at: new Date().toISOString(),
-                  expires_at: data.expires_at || null
-                };
-                localStorage.setItem('festifly_user', JSON.stringify(userData));
-              }
-              
-              setShowPremium(false);
-              alert(`✅ Payment successful! You are now a Premium user with ${plan} plan.`);
-            } else {
-              alert(data.error || "Payment verification had an issue. Please contact support.");
-            }
-          })
-          .catch(error => {
-            console.error("Payment verification error:", error);
-            alert("There was an error confirming your payment. Please contact support.");
-          });
+        .then((res) => {
+          console.log('Payment response status:', res.status); // Debug response status
+          if (!res.ok) {
+            throw new Error(`Server returned ${res.status}`);
+          }
+          return res.json();
+        })
+        .then((data) => {
+          console.log('Payment response data:', data); // Debug response data
+          if (data.success) {
+            // Refresh premium status
+            fetchUserPremiumStatus();
+            alert(`✅ Payment successful! You are now a Premium user with ${plan} plan.`);
+          } else {
+            console.error('Payment verification failed:', data);
+            alert(data.error || "Payment verification had an issue. Please contact support.");
+          }
+        })
+        .catch(error => {
+          console.error("Payment verification error:", error);
+          alert(`There was an error confirming your payment: ${error.message}. Please contact support.`);
+        });
       },
       prefill: {
         email: userEmail,
         name: userName
       },
       theme: {
-        color: "#7C3AED", // Purple color to match your theme
+        color: "#7C3AED",
       },
     };
 
@@ -195,6 +200,35 @@ const OnboardingPage = () => {
       launchRazorpayCheckout(plan);
     }
   };
+
+  // Add this function to fetch premium status
+  const fetchUserPremiumStatus = async () => {
+    if (!isAuthenticated()) return;
+    
+    setLoadingPremiumStatus(true);
+    try {
+      const token = Cookies.get('jwt');
+      const response = await axios.get('http://localhost:8000/api/user/profile/', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data && response.data.premium) {
+        setUserPremiumStatus(response.data.premium);
+        console.log('User premium status updated:', response.data.premium);
+      }
+    } catch (error) {
+      console.error('Error fetching premium status:', error);
+    } finally {
+      setLoadingPremiumStatus(false);
+    }
+  };
+
+  // Add effect to fetch premium status when showing modal
+  useEffect(() => {
+    if (showPremium) {
+      fetchUserPremiumStatus();
+    }
+  }, [showPremium]);
 
   return (
     <div className="min-h-screen py-12 px-4">
