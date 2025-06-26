@@ -9,6 +9,7 @@ urlpatterns = [
     path('smart-planner/', smart_planner, name='ai_travel_suggestions'),   
     path('get-all-festivals/', get_all_festivals, name='get_all_festivals'), 
     path("fetch-reddit-reviews/", fetch_reddit_reviews_by_id, name="fetch_reddit_reviews"),
+    path("enhance-festival-ai/", enhance_festival_ai, name="enhance_festival_ai"),
     path("generate-voice-briefing/", generate_voice_briefing, name="generate_voice_briefing"),
     path("generate-ai-video/", generate_ai_video, name="generate_ai_video"),
 
@@ -28,5 +29,9 @@ urlpatterns = [
     path('user/profile/', user_profile, name='user-profile'),
     path('user/update-profile/', update_profile, name='update-profile'),
     path('user/apply-referral/', apply_referral, name='apply-referral'),
+
+
+    #test urls
+    path('heygen-generate/', generate_heygen_video, name='generate_heygen_video'),
     path('payment-success/', payment_success, name='payment-success'),
 ]
