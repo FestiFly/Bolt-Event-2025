@@ -6,7 +6,7 @@ import OnboardingPage from './pages/OnboardingPage';
 import DiscoveryPage from './pages/DiscoveryPage';
 import TripPlannerPage from './pages/TripPlannerPage';
 import OrganizerPanel from './pages/OrganizerPanel';
-import AuthPage from './pages/User_Login';
+import AuthPage from './pages/UserLogin';
 import ProfilePage from './pages/ProfilePage';
 import BoltBadge from './components/BoltBadge';
 

@@ -2,6 +2,7 @@ from django.urls import path
 from .views import *
 from .organizer import *
 from .users import *
+
 urlpatterns = [
     path('recommendations/', get_recommendations, name='get_recommendations'),
     path("festival-detail/", get_festival_by_id, name="get_festival_by_id"),
@@ -14,6 +15,10 @@ urlpatterns = [
     #organizer urls
     path('organizer/signup/', organizer_signup, name='organizer-signup'), 
     path('organizer/login/', organizer_login, name='organizer-login'),
+    path('organizer/festival/create/', create_festival, name='create-festival'),
+    path('organizer/festivals/', list_organizer_festivals, name='list-festivals'),
+    path('organizer/festival/<str:fest_id>/update/', update_festival, name='update-festival'),
+    path('organizer/festival/<str:fest_id>/delete/', delete_festival, name='delete-festival'),
 
 
     #user urls

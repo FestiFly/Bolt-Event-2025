@@ -1,5 +1,6 @@
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
+from rest_framework.decorators import api_view
 import json
 from pymongo import MongoClient, DESCENDING
 from bson.objectid import ObjectId
