@@ -1,22 +1,129 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import axios from 'axios';
 import Navigation from './components/Navigation';
 import OnboardingPage from './pages/OnboardingPage';
 import DiscoveryPage from './pages/DiscoveryPage';
 import TripPlannerPage from './pages/TripPlannerPage';
 import OrganizerPanel from './pages/OrganizerPanel';
+import AuthPage from './pages/User_Login';
+import ProfilePage from './pages/ProfilePage';
 import BoltBadge from './components/BoltBadge';
 
+// Auth utility functions
+const AUTH_TOKEN_KEY = 'festifly_token';
+const USER_KEY = 'festifly_user';
+
+const isAuthenticated = (): boolean => {
+  return !!localStorage.getItem(AUTH_TOKEN_KEY);
+};
+
+const getToken = (): string | null => {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+};
+
+const setupAxiosInterceptors = (): void => {
+  axios.interceptors.request.use(
+    (config) => {
+      const token = getToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    },
+    (error) => {
+      return Promise.reject(error);
+    }
+  );
+  
+  // Handle authentication errors
+  axios.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      if (error.response && error.response.status === 401) {
+        // Unauthorized - clear token and redirect to login
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+        window.location.href = '/auth';
+      }
+      return Promise.reject(error);
+    }
+  );
+};
+
+// Protected route component
+const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
+  if (!isAuthenticated()) {
+    return <Navigate to="/auth" replace />;
+  }
+  return children;
+};
+
 function App() {
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Set up axios interceptors and verify authentication on load
+  useEffect(() => {
+    setupAxiosInterceptors();
+    
+    // Just mark authentication check as complete
+    // The actual check is done by the ProtectedRoute component
+    setAuthChecked(true);
+  }, []);
+
+  if (!authChecked) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundImage: "linear-gradient(to bottom right, rgb(17, 24, 39), rgb(88, 28, 135), rgb(49, 46, 129))"
+      }}>
+        <div style={{
+          color: "white",
+          fontSize: "1.25rem",
+          animation: "pulse 1.5s infinite"
+        }}>Loading...</div>
+        <style dangerouslySetInnerHTML={{ __html: `
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+          }
+        `}} />
+      </div>
+    );
+  }
+
   return (
     <Router>
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900">
+      <div style={{
+        minHeight: "100vh",
+        backgroundImage: "linear-gradient(to bottom right, rgb(17, 24, 39), rgb(88, 28, 135), rgb(49, 46, 129))"
+      }}>
         <Navigation />
         <Routes>
           <Route path="/" element={<OnboardingPage />} />
           <Route path="/discover" element={<DiscoveryPage />} />
+          <Route path="/auth" element={<AuthPage />} />
           <Route path="/trip/:festivalId" element={<TripPlannerPage />} />
-          <Route path="/organizer" element={<OrganizerPanel />} />
+          <Route 
+            path="/organizer" 
+            element={
+              <ProtectedRoute>
+                <OrganizerPanel />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <BoltBadge />
       </div>
