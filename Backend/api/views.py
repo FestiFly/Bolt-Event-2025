@@ -605,3 +605,39 @@ def generate_ai_video(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+#=============================================================== Users ===========================================================
+
+@csrf_exempt
+@api_view(["POST"])
+def payment_success(request):
+    try:
+        data = json.loads(request.body)
+        email = data.get("email")
+        plan = data.get("plan")  # "monthly" or "yearly"
+
+        if not email or not plan:
+            return JsonResponse({"error": "Missing email or plan"}, status=400)
+
+        user_collection = db["users"]
+        now = datetime.utcnow()
+
+        if plan == "monthly":
+            expire_time = now.replace(microsecond=0) + timedelta(days=30)
+            update_fields = {"is_pro": True, "expire_time": expire_time}
+        elif plan == "yearly":
+            expire_time = now.replace(microsecond=0) + timedelta(days=365)
+            update_fields = {"is_plus": True, "expire_time": expire_time}
+        else:
+            return JsonResponse({"error": "Invalid plan"}, status=400)
+
+        user_collection.update_one(
+            {"email": email},
+            {"$set": update_fields},
+            upsert=True
+        )
+
+        return JsonResponse({"message": "Subscription updated."}, status=200)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
