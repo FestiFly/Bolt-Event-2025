@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Edit2, Save, X, Camera, Loader, MapPin, Heart, Users, Link as LinkIcon, Copy, Check, AlertCircle, Crown } from 'lucide-react';
 import axios from 'axios';
+import Cookies from 'js-cookie';
 import { checkPremiumStatus, formatExpiryDate } from '/utils/premium';
 
 // Auth utility function
@@ -60,7 +61,7 @@ const ProfilePage = () => {
 
   const fetchUserProfile = async () => {
     try {
-      const token = localStorage.getItem('festifly_token');
+      const token = Cookies.get('jwt');
       if (!token) return;
       
       const response = await axios.get('http://localhost:8000/api/user/profile/', {
@@ -130,7 +131,7 @@ const ProfilePage = () => {
     setLoading(true);
     
     try {
-      const token = localStorage.getItem('festifly_token');
+      const token = Cookies.get('jwt');
       
       const updatedUser = {
         ...user,
@@ -171,7 +172,7 @@ const ProfilePage = () => {
     setReferralSubmitLoading(true);
     
     try {
-      const token = localStorage.getItem('festifly_token');
+      const token = Cookies.get('jwt');
       
       const response = await axios.post(
         'http://localhost:8000/api/user/apply-referral/',

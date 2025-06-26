@@ -125,9 +125,8 @@ const AuthPage: React.FC = () => {
       storeAuthData(response.data.token, response.data.user);
       
       setMessage('Login successful! Redirecting...');
-      
-      // Redirect after a short delay
       setTimeout(() => {
+        window.location.reload(); // Reload to update nav/profile button
         navigate('/discover');
       }, 1000);
       
@@ -166,9 +165,8 @@ const AuthPage: React.FC = () => {
       storeAuthData(response.data.token, response.data.user);
       
       setMessage('Account created successfully! Redirecting...');
-      
-      // Redirect after a short delay
       setTimeout(() => {
+        window.location.reload(); // Reload to update nav/profile button
         navigate('/discover');
       }, 1000);
       
