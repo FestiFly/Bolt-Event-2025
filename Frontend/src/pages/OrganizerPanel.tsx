@@ -58,7 +58,7 @@ const OrganizerPanel = () => {
     }
   };
 
-    const fetchFestivals = async () => {
+  const fetchFestivals = async () => {
     try {
       const response = await fetch('http://127.0.0.1:8000/api/organizer/festivals/');
       const data = await response.json();
@@ -77,7 +77,7 @@ const OrganizerPanel = () => {
   };
 
 
-    const handleAddFestival = async () => {
+  const handleAddFestival = async () => {
     try {
       const response = await fetch('http://127.0.0.1:8000/api/organizer/festival/create/', {
         method: "POST",
@@ -97,7 +97,7 @@ const OrganizerPanel = () => {
   };
 
 
-    const handleDeleteFestival = async (id: string) => {
+  const handleDeleteFestival = async (id: string) => {
     if (!confirm("Are you sure you want to delete?")) return;
     await fetch(`http://127.0.0.1:8000/api/organizer/festival/${id}/delete/`, {
       method: "DELETE"
@@ -132,7 +132,14 @@ const OrganizerPanel = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center py-12 px-4">
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "3rem 1rem",
+        backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
+      }}>
         <div className="max-w-md w-full">
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 shadow-2xl border border-white/20">
             <div className="text-center mb-8">
@@ -140,7 +147,7 @@ const OrganizerPanel = () => {
               <h2 className="text-3xl font-bold text-white mb-2">Organizer Access</h2>
               <p className="text-gray-300">Please login to access the festival management panel</p>
             </div>
-            
+
             <div className="space-y-6">
               <div>
                 <label className="block text-white font-medium mb-2">Username</label>
@@ -152,7 +159,7 @@ const OrganizerPanel = () => {
                   placeholder="Enter username"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-white font-medium mb-2">Password</label>
                 <input
@@ -163,14 +170,14 @@ const OrganizerPanel = () => {
                   placeholder="Enter password"
                 />
               </div>
-              
+
               <button
                 onClick={handleLogin}
                 className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
               >
                 Login
               </button>
-              
+
             </div>
           </div>
         </div>
@@ -179,14 +186,17 @@ const OrganizerPanel = () => {
   }
 
   return (
-    <div className="min-h-screen py-8 px-4">
+    <div className="min-h-screen py-8 px-4"
+    style={{
+        background: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
+      }}>
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-bold text-white mb-2">Organizer Panel</h1>
             <p className="text-gray-300">Manage festivals and submissions</p>
           </div>
-          
+
           <div className="flex items-center space-x-4">
             <button
               onClick={() => setShowAddForm(true)}
@@ -195,7 +205,7 @@ const OrganizerPanel = () => {
               <Plus className="h-5 w-5" />
               <span>Add Festival</span>
             </button>
-            
+
             <button
               onClick={() => setIsAuthenticated(false)}
               className="px-4 py-2 bg-red-600/20 text-red-200 border border-red-400/30 rounded-lg hover:bg-red-600/30 transition-colors"
@@ -220,7 +230,7 @@ const OrganizerPanel = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
             <div className="flex items-center justify-between">
               <div>
@@ -234,7 +244,7 @@ const OrganizerPanel = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
             <div className="flex items-center justify-between">
               <div>
@@ -260,7 +270,7 @@ const OrganizerPanel = () => {
                 <X className="h-5 w-5 text-gray-400" />
               </button>
             </div>
-            
+
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-white font-medium mb-2">Festival Name</label>
@@ -272,7 +282,7 @@ const OrganizerPanel = () => {
                   placeholder="Enter festival name"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-white font-medium mb-2">Location</label>
                 <input
@@ -283,7 +293,7 @@ const OrganizerPanel = () => {
                   placeholder="City, State"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-white font-medium mb-2">Subreddit</label>
                 <input
@@ -294,7 +304,7 @@ const OrganizerPanel = () => {
                   placeholder="r/subredditname"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-white font-medium mb-2">Tags</label>
                 <div className="flex flex-wrap gap-2 mb-2">
@@ -326,7 +336,7 @@ const OrganizerPanel = () => {
                 />
               </div>
             </div>
-            
+
             <div className="flex justify-end space-x-4 mt-6">
               <button
                 onClick={() => setShowAddForm(false)}
@@ -350,7 +360,7 @@ const OrganizerPanel = () => {
           <div className="p-6 border-b border-white/20">
             <h2 className="text-2xl font-bold text-white">Festival Management</h2>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>

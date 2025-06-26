@@ -22,7 +22,6 @@ const OnboardingPage = () => {
     'Film', 'Literature', 'Sports', 'Gaming', 'Wellness', 'Dance'
   ];
 
-  // Decode JWT token to check authentication
   const decodeJWT = (token: string) => {
     try {
       const base64Url = token.split('.')[1];
@@ -36,40 +35,36 @@ const OnboardingPage = () => {
     }
   };
 
-  // Check if user is authenticated using JWT token
   const isAuthenticated = (): boolean => {
     const token = Cookies.get('jwt');
     if (!token) return false;
-    
+
     const decodedToken = decodeJWT(token);
     return !!(decodedToken && decodedToken.exp > Date.now() / 1000);
   };
 
-  // Check user's subscription plan directly from JWT
   const getUserSubscriptionPlan = (): string | null => {
     const token = Cookies.get('jwt');
     if (!token) return null;
-    
+
     const decodedToken = decodeJWT(token);
     return decodedToken?.plan || null;
   };
 
-  // Add this function to check subscription status directly from the backend
   const checkSubscriptionStatus = async () => {
     if (!isAuthenticated()) return;
-    
+
     try {
       const token = Cookies.get('jwt');
       const response = await axios.get('http://localhost:8000/api/subscription/status/', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       console.log('Subscription status check:', response.data);
-      
+
       if (response.data) {
-        // If API reports subscription as expired, update our local state
         if (!response.data.is_active && response.data.is_expired) {
-          setUserPremiumStatus(prev => ({
+          setUserPremiumStatus((prev: any) => ({
             ...prev,
             is_active: false,
             expired: true
@@ -81,11 +76,9 @@ const OnboardingPage = () => {
     }
   };
 
-  // Add effect to check subscription status on component mount
   useEffect(() => {
     checkSubscriptionStatus();
-    
-    // Existing code to get subscription from JWT
+
     const plan = getUserSubscriptionPlan();
     if (plan) {
       setUserPremiumStatus({
@@ -95,9 +88,7 @@ const OnboardingPage = () => {
     }
   }, []);
 
-  // Add this effect to check premium modal opening
   useEffect(() => {
-    // Check if we should open premium modal from URL parameter
     const searchParams = new URLSearchParams(location.search);
     const openPremium = searchParams.get('openPremium');
     if (openPremium === 'true') {
@@ -148,22 +139,20 @@ const OnboardingPage = () => {
     setShowPremium(true);
   };
 
-  // Add this function to fetch premium status
   const fetchUserPremiumStatus = async () => {
     if (!isAuthenticated()) return;
-    
+
     setLoadingPremiumStatus(true);
     try {
       const token = Cookies.get('jwt');
       const response = await axios.get('http://localhost:8000/api/user/profile/', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (response.data && response.data.premium) {
         setUserPremiumStatus(response.data.premium);
         console.log('User premium status updated from API:', response.data.premium);
       } else {
-        // Fallback to JWT token plan if API doesn't return premium status
         const planFromToken = getUserSubscriptionPlan();
         if (planFromToken) {
           setUserPremiumStatus({
@@ -175,7 +164,6 @@ const OnboardingPage = () => {
       }
     } catch (error) {
       console.error('Error fetching premium status:', error);
-      // Fallback to JWT token plan if API call fails
       const planFromToken = getUserSubscriptionPlan();
       if (planFromToken) {
         setUserPremiumStatus({
@@ -189,7 +177,6 @@ const OnboardingPage = () => {
     }
   };
 
-  // Add effect to fetch premium status when showing modal
   useEffect(() => {
     if (showPremium) {
       fetchUserPremiumStatus();
@@ -203,21 +190,20 @@ const OnboardingPage = () => {
       return;
     }
 
-    // Get user data from JWT token
     const token = Cookies.get('jwt');
     const decodedToken = decodeJWT(token!);
-    
+
     let userEmail = "";
     let userName = "";
     let userId = "";
-    
+
     if (decodedToken) {
       userEmail = decodedToken.email || "";
       userName = decodedToken.username || "";
       userId = decodedToken.user_id || "";
     }
 
-    console.log('Payment data:', { userEmail, userName, userId, plan }); // Debug log
+    console.log('Payment data:', { userEmail, userName, userId, plan });
 
     if (!userId) {
       alert("Could not identify user. Please try logging in again.");
@@ -233,7 +219,7 @@ const OnboardingPage = () => {
       description: `${plan === "monthly" ? "Monthly" : "Yearly"} Premium Access`,
       handler: function (response: any) {
         const authToken = Cookies.get('jwt');
-        
+
         const paymentData = {
           payment_id: response.razorpay_payment_id,
           plan: plan,
@@ -242,7 +228,7 @@ const OnboardingPage = () => {
         };
 
         console.log('Sending payment data to backend:', paymentData);
-        
+
         fetch("http://localhost:8000/api/payment-success/", {
           method: "POST",
           headers: {
@@ -258,18 +244,16 @@ const OnboardingPage = () => {
         .then((data) => {
           console.log('Payment response data:', data);
           if (data.success) {
-            // Update JWT token with new plan info if provided
             if (data.token) {
               Cookies.set('jwt', data.token, { expires: 7 });
             }
-            
-            // Update user premium status
+
             setUserPremiumStatus({
               is_active: true,
               plan: plan,
               expires_at: data.expires_at
             });
-            
+
             alert(`✅ Payment successful! You are now a Premium user with ${plan} plan.`);
           } else {
             console.error('Payment verification failed:', data);
@@ -295,13 +279,11 @@ const OnboardingPage = () => {
   };
 
   const handleSubscribeClick = (plan: "monthly" | "yearly") => {
-    // Check if user already has this plan
     if (userPremiumStatus?.is_active && userPremiumStatus?.plan === plan) {
       alert(`You are already subscribed to the ${plan} plan!`);
       return;
     }
 
-    // Final authentication check before payment
     if (!isAuthenticated()) {
       alert("Please log in to subscribe to premium plans");
       navigate('/auth');
@@ -320,7 +302,6 @@ const OnboardingPage = () => {
     }
   };
 
-  // Utility functions to check subscription status
   const isPlanActive = (plan: "monthly" | "yearly"): boolean => {
     return userPremiumStatus?.is_active && userPremiumStatus?.plan === plan;
   };
@@ -338,7 +319,7 @@ const OnboardingPage = () => {
     if (isPlanActive(plan)) {
       return "w-full py-3 bg-green-600 text-white rounded-lg font-semibold cursor-default";
     }
-    
+
     if (plan === "monthly") {
       return "w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl";
     } else {
@@ -350,7 +331,7 @@ const OnboardingPage = () => {
     if (isPlanActive(plan)) {
       return "flex-1 rounded-xl p-6 border bg-green-500/20 border-green-500/50";
     }
-    
+
     if (plan === "monthly") {
       return "flex-1 bg-white/5 rounded-xl p-6 border border-white/10 hover:border-purple-500/50 transition-all hover:bg-white/10 hover:scale-[1.02]";
     } else {
@@ -358,22 +339,19 @@ const OnboardingPage = () => {
     }
   };
 
-  // Add this utility function near the top of your component
   const formatDateTime = (dateString: string | null): string => {
     if (!dateString) return 'N/A';
-    
+
     try {
-      // Parse the UTC date string
       const date = new Date(dateString);
-      
-      // Format as Indian date and time (IST)
+
       return new Intl.DateTimeFormat('en-IN', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-        timeZone: 'Asia/Kolkata', // Indian timezone
+        timeZone: 'Asia/Kolkata',
         timeZoneName: 'short'
       }).format(date);
     } catch (error) {
@@ -382,30 +360,28 @@ const OnboardingPage = () => {
     }
   };
 
-  // Add this function to display remaining time in subscription
   const getRemainingTime = (expiryDate: string): string => {
     if (!expiryDate) return '';
-    
+
     try {
       const expiry = new Date(expiryDate);
       const now = new Date();
       const diffMs = expiry.getTime() - now.getTime();
-      
+
       if (diffMs <= 0) return 'Expired';
-      
-      // Calculate days, hours, minutes
+
       const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
       const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      
+
       if (days > 30) {
         const months = Math.floor(days / 30);
         return `${months} month${months > 1 ? 's' : ''} remaining`;
       }
-      
+
       if (days > 0) {
         return `${days} day${days > 1 ? 's' : ''} ${hours} hr${hours !== 1 ? 's' : ''} remaining`;
       }
-      
+
       return `${hours} hour${hours !== 1 ? 's' : ''} remaining`;
     } catch (error) {
       console.error('Error calculating remaining time:', error);
@@ -414,8 +390,15 @@ const OnboardingPage = () => {
   };
 
   return (
-    <div className="min-h-screen py-12 px-4">
-      <div className="max-w-2xl mx-auto">
+    <div style={{
+      minHeight: "100vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "3rem 1rem",
+      backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
+    }}>
+      <div className="max-w-2xl mx-auto w-full">
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold text-white mb-4">
             Discover Your Next
@@ -467,24 +450,24 @@ const OnboardingPage = () => {
             </div>
 
             <div>
-                <label className="flex items-center space-x-2 text-white font-semibold mb-4">
-                  <Calendar className="h-5 w-5 text-purple-400" />
-                  <span>Which month are you planning for?</span>
-                </label>
-                <select
-                  value={formData.startDate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="">Select a month</option>
-                  {[
-                    'January', 'February', 'March', 'April', 'May', 'June',
-                    'July', 'August', 'September', 'October', 'November', 'December'
-                  ].map(month => (
-                    <option key={month} value={month}>{month}</option>
-                  ))}
-                </select>
-              </div>
+              <label className="flex items-center space-x-2 text-white font-semibold mb-4">
+                <Calendar className="h-5 w-5 text-purple-400" />
+                <span>Which month are you planning for?</span>
+              </label>
+              <select
+                value={formData.startDate}
+                onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="">Select a month</option>
+                {[
+                  'January', 'February', 'March', 'April', 'May', 'June',
+                  'July', 'August', 'September', 'October', 'November', 'December'
+                ].map(month => (
+                  <option key={month} value={month}>{month}</option>
+                ))}
+              </select>
+            </div>
 
             <div className="flex flex-col sm:flex-row gap-4">
               <button
@@ -514,8 +497,7 @@ const OnboardingPage = () => {
                 <Crown className="h-16 w-16 text-yellow-400 mx-auto mb-4" />
                 <h3 className="text-2xl font-bold text-white mb-2">Upgrade Your Festival Experience</h3>
                 <p className="text-gray-300">Choose the plan that fits your festival lifestyle</p>
-                
-                {/* Show current subscription status */}
+
                 {userPremiumStatus?.is_active && (
                   <div className="inline-flex items-center gap-2 bg-green-500/20 border border-green-500/30 rounded-lg px-4 py-2 mt-4">
                     <Check size={16} className="text-green-400" />
@@ -533,9 +515,8 @@ const OnboardingPage = () => {
                   </div>
                 )}
               </div>
-              
+
               <div className="flex flex-col md:flex-row gap-6">
-                {/* Monthly Plan */}
                 <div className={getPlanCardStyle("monthly")}>
                   <div className="text-center mb-4">
                     <div className="flex items-center justify-center gap-2 mb-2">
@@ -548,7 +529,7 @@ const OnboardingPage = () => {
                     </div>
                     <div className="h-[1px] w-full bg-white/20 my-4"></div>
                   </div>
-                  
+
                   <ul className="space-y-3 mb-6">
                     <li className="flex items-start gap-2 text-gray-200">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
@@ -581,7 +562,7 @@ const OnboardingPage = () => {
                       <span>Standard trip planning tools</span>
                     </li>
                   </ul>
-                  
+
                   <button
                     onClick={() => handleSubscribeClick("monthly")}
                     disabled={loadingPremiumStatus || isPlanActive('monthly')}
@@ -590,15 +571,14 @@ const OnboardingPage = () => {
                     {getButtonText('monthly')}
                   </button>
                 </div>
-                
-                {/* Yearly Plan */}
+
                 <div className={getPlanCardStyle("yearly")}>
                   {!isPlanActive('yearly') && (
                     <div className="absolute -top-3 right-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-black text-xs font-bold py-1 px-4 rounded-full">
                       BEST VALUE • Save 50%
                     </div>
                   )}
-                  
+
                   <div className="text-center mb-4">
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <h4 className="text-xl font-bold text-white">Yearly Plan</h4>
@@ -611,7 +591,7 @@ const OnboardingPage = () => {
                     <p className="text-yellow-300 text-sm">Just ₹25 per month</p>
                     <div className="h-[1px] w-full bg-white/20 my-4"></div>
                   </div>
-                  
+
                   <ul className="space-y-3 mb-6">
                     <li className="flex items-start gap-2 text-gray-200">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
@@ -650,7 +630,7 @@ const OnboardingPage = () => {
                       <span>Early bird access to festival tickets</span>
                     </li>
                   </ul>
-                  
+
                   <button
                     onClick={() => handleSubscribeClick("yearly")}
                     disabled={loadingPremiumStatus || isPlanActive('yearly')}
@@ -660,7 +640,7 @@ const OnboardingPage = () => {
                   </button>
                 </div>
               </div>
-              
+
               <button
                 onClick={() => setShowPremium(false)}
                 className="mt-6 mx-auto block px-6 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors"

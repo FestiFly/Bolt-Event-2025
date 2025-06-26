@@ -35,7 +35,8 @@ const isAuthenticated = (): boolean => {
 };
 
 const getToken = (): string | null => {
-  return Cookies.get('jwt');
+  const token = Cookies.get('jwt');
+  return token === undefined ? null : token;
 };
 
 const setupAxiosInterceptors = (): void => {
