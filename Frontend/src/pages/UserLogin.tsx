@@ -2,35 +2,47 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Shield, UserPlus, UserCheck, Mail, Lock, User, Tag, AlertCircle, Loader, Link as LinkIcon } from 'lucide-react';
 import axios from 'axios';
+import Cookies from 'js-cookie'; // Import js-cookie
 
 // Inline authentication utility functions
-const AUTH_TOKEN_KEY = 'festifly_token';
+const AUTH_TOKEN_KEY = 'jwt';
 const USER_KEY = 'festifly_user';
 const API_URL = 'http://localhost:8000/api';
 
+// Function to store auth data in cookies and limited user info in localStorage
 const storeAuthData = (token: string, user: any): void => {
-  localStorage.setItem(AUTH_TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  Cookies.set(AUTH_TOKEN_KEY, token, { expires: 7 }); // Store token in cookie for 7 days
+
+  // Store only name and email in localStorage
+  const userData = {
+    name: user.name,
+    email: user.email
+  };
+  localStorage.setItem(USER_KEY, JSON.stringify(userData));
 };
 
+// Function to clear auth data
 const clearAuthData = (): void => {
-  localStorage.removeItem(AUTH_TOKEN_KEY);
+  Cookies.remove(AUTH_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
 };
 
+// Function to check if user is authenticated
 const isAuthenticated = (): boolean => {
-  return !!localStorage.getItem(AUTH_TOKEN_KEY);
+  return !!Cookies.get(AUTH_TOKEN_KEY);
 };
 
+// Function to get current user's name and email
 const getCurrentUser = (): any => {
   const userJson = localStorage.getItem(USER_KEY);
   return userJson ? JSON.parse(userJson) : null;
 };
 
+// Function to setup axios interceptors
 const setupAxiosInterceptors = (): void => {
   axios.interceptors.request.use(
     (config) => {
-      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      const token = Cookies.get(AUTH_TOKEN_KEY);
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -113,9 +125,8 @@ const AuthPage: React.FC = () => {
       storeAuthData(response.data.token, response.data.user);
       
       setMessage('Login successful! Redirecting...');
-      
-      // Redirect after a short delay
       setTimeout(() => {
+        window.location.reload(); // Reload to update nav/profile button
         navigate('/discover');
       }, 1000);
       
@@ -154,9 +165,8 @@ const AuthPage: React.FC = () => {
       storeAuthData(response.data.token, response.data.user);
       
       setMessage('Account created successfully! Redirecting...');
-      
-      // Redirect after a short delay
       setTimeout(() => {
+        window.location.reload(); // Reload to update nav/profile button
         navigate('/discover');
       }, 1000);
       

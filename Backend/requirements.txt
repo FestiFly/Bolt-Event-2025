@@ -11,3 +11,5 @@ requests==2.32.3
 python-dotenv
 textblob
 google-generativeai
+duckduckgo-search
+beautifulsoup4
