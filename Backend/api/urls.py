@@ -20,6 +20,8 @@ urlpatterns = [
     path('organizer/festivals/', list_organizer_festivals, name='list-festivals'),
     path('organizer/festival/<str:fest_id>/update/', update_festival, name='update-festival'),
     path('organizer/festival/<str:fest_id>/delete/', delete_festival, name='delete-festival'),
+    path('payment-success/', payment_success, name='payment-success'),
+    path('subscription/status/', check_subscription_status, name='check_subscription_status'),
 
 
     #user urls
@@ -33,6 +35,5 @@ urlpatterns = [
 
     #test urls
     path('heygen-generate/', generate_heygen_video, name='generate_heygen_video'),
-    path('payment-success/', payment_success, name='payment-success'),
-    path('subscription/status/', check_subscription_status, name='check_subscription_status'),
+
 ]

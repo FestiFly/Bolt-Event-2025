@@ -503,7 +503,7 @@ const OrganizerPanel = () => {
         </div>
       </div>
 
-      {/* {* Animation Styles */} */
+      {/* {* Animation Styles */}
 
       <style>{`
         @keyframes fadeIn {
