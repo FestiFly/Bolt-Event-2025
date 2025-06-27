@@ -12,14 +12,18 @@ urlpatterns = [
     path("enhance-festival-ai/", enhance_festival_ai, name="enhance_festival_ai"),
     path("generate-voice-briefing/", generate_voice_briefing, name="generate_voice_briefing"),
     path("generate-ai-video/", generate_ai_video, name="generate_ai_video"),
+    path('subscription/status/', subscription_status, name='subscription_status'),
 
     #organizer urls
     path('organizer/signup/', organizer_signup, name='organizer-signup'), 
     path('organizer/login/', organizer_login, name='organizer-login'),
     path('organizer/festival/create/', create_festival, name='create-festival'),
     path('organizer/festivals/', list_organizer_festivals, name='list-festivals'),
+    path('user/festival-preferences/', get_festivals_by_user_preference, name='get_festivals_by_user_preference'),
     path('organizer/festival/<str:fest_id>/update/', update_festival, name='update-festival'),
     path('organizer/festival/<str:fest_id>/delete/', delete_festival, name='delete-festival'),
+    path('payment-success/', payment_success, name='payment-success'),
+    path('subscription/status/', check_subscription_status, name='check_subscription_status'),
     path('organizer/google-auth/', organizer_google_auth, name='organizer-google-auth'),
 
 
@@ -35,6 +39,5 @@ urlpatterns = [
 
     #test urls
     path('heygen-generate/', generate_heygen_video, name='generate_heygen_video'),
-    path('payment-success/', payment_success, name='payment-success'),
-    path('subscription/status/', check_subscription_status, name='check_subscription_status'),
+
 ]
