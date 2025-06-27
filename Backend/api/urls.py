@@ -12,6 +12,7 @@ urlpatterns = [
     path("enhance-festival-ai/", enhance_festival_ai, name="enhance_festival_ai"),
     path("generate-voice-briefing/", generate_voice_briefing, name="generate_voice_briefing"),
     path("generate-ai-video/", generate_ai_video, name="generate_ai_video"),
+    path('subscription/status/', subscription_status, name='subscription_status'),
 
     #organizer urls
     path('organizer/signup/', organizer_signup, name='organizer-signup'), 
@@ -23,6 +24,7 @@ urlpatterns = [
     path('organizer/festival/<str:fest_id>/delete/', delete_festival, name='delete-festival'),
     path('payment-success/', payment_success, name='payment-success'),
     path('subscription/status/', check_subscription_status, name='check_subscription_status'),
+    path('organizer/google-auth/', organizer_google_auth, name='organizer-google-auth'),
 
 
     #user urls
@@ -32,6 +34,7 @@ urlpatterns = [
     path('user/profile/', user_profile, name='user-profile'),
     path('user/update-profile/', update_profile, name='update-profile'),
     path('user/apply-referral/', apply_referral, name='apply-referral'),
+    path('user/google-auth/', google_auth, name='google-auth'),
 
 
     #test urls
