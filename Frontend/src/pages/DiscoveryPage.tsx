@@ -47,7 +47,7 @@ const DiscoveryPage = () => {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [userPremiumStatus, setUserPremiumStatus] = useState<any>(null);
   const [loadingPremiumStatus, setLoadingPremiumStatus] = useState(false);
-  
+
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     location: '',
@@ -84,7 +84,7 @@ const DiscoveryPage = () => {
     try {
       const base64Url = token.split('.')[1];
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
         return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
       }).join(''));
       return JSON.parse(jsonPayload);
@@ -97,7 +97,7 @@ const DiscoveryPage = () => {
   const isAuthenticated = (): boolean => {
     const token = Cookies.get('jwt');
     if (!token) return false;
-    
+
     const decodedToken = decodeJWT(token);
     return !!(decodedToken && decodedToken.exp > Date.now() / 1000);
   };
@@ -117,10 +117,10 @@ const DiscoveryPage = () => {
 
   const getPremiumBadge = () => {
     if (!user || !isPremiumUser()) return null;
-    
+
     const badgeColor = user.plan === 'yearly' ? 'from-yellow-400 to-orange-500' : 'from-purple-400 to-pink-500';
     const badgeText = user.plan === 'yearly' ? 'YEARLY PRO' : 'MONTHLY PRO';
-    
+
     return (
       <span className={`inline-flex items-center space-x-1 px-2 py-1 bg-gradient-to-r ${badgeColor} text-black text-xs font-bold rounded-full`}>
         <Crown className="h-3 w-3" />
@@ -194,7 +194,7 @@ const DiscoveryPage = () => {
 
     setPersonalizedLoading(true);
     setPersonalizedError(null);
-    
+
     try {
       const jwt = Cookies.get('jwt');
       const response = await fetch('http://localhost:8000/api/user/festival-preferences/', {
@@ -203,16 +203,16 @@ const DiscoveryPage = () => {
           'Authorization': `Bearer ${jwt}`,
         },
       });
-      
+
       const data = await response.json();
-      
+
       if (response.status === 403) {
         setPersonalizedError(data.error || 'This feature is only available for pro/plus users.');
         setShowPremiumModal(true);
         setPersonalizedLoading(false);
         return;
       }
-      
+
       if (data.festivals && Array.isArray(data.festivals)) {
         setFestivals(data.festivals);
         setPersonalizedError(null);
@@ -576,11 +576,11 @@ const DiscoveryPage = () => {
       // Search filter with null safety
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
-        const matchesSearch = 
+        const matchesSearch =
           safeIncludes(festival.title, searchLower) ||
           safeIncludes(festival.location, searchLower) ||
-          (festival.tags && Array.isArray(festival.tags) && 
-           festival.tags.some(tag => safeIncludes(tag, searchLower))) ||
+          (festival.tags && Array.isArray(festival.tags) &&
+            festival.tags.some(tag => safeIncludes(tag, searchLower))) ||
           safeIncludes(festival.content, searchLower);
         if (!matchesSearch) return false;
       }
@@ -605,8 +605,8 @@ const DiscoveryPage = () => {
       // Tags filter with null safety
       if (filters.tags.length > 0) {
         if (!festival.tags || !Array.isArray(festival.tags)) return false;
-        const hasMatchingTag = filters.tags.some(filterTag => 
-          festival.tags.some(festivalTag => 
+        const hasMatchingTag = filters.tags.some(filterTag =>
+          festival.tags.some(festivalTag =>
             safeIncludes(festivalTag, filterTag)
           )
         );
@@ -680,7 +680,8 @@ const DiscoveryPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900">
+      <div className="min-h-screen flex items-center justify-center "
+        style={{ backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))" }}>
         <div className="text-center">
           <Loader className="h-12 w-12 text-purple-400 animate-spin mx-auto mb-4" />
           <p className="text-white text-xl">Discovering amazing festivals for you...</p>
@@ -690,7 +691,7 @@ const DiscoveryPage = () => {
   }
 
   return (
-    <div className="min-h-screen py-8 px-4 bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900">
+    <div className="min-h-screen py-8 px-4" style={{ backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))" }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
@@ -702,69 +703,41 @@ const DiscoveryPage = () => {
             {searchParams?.startDate && `${searchParams.startDate} • `}
             {filteredAndSortedFestivals.length} of {festivals.length} festivals
           </p>
-          
+
           {/* User Status and Personalized Button */}
-          <div className="mt-6 flex flex-col items-center gap-4">
-            {/* User Status Display */}
-            {user && (
-              <div className="flex items-center space-x-3 bg-white/10 backdrop-blur-lg rounded-lg px-4 py-2 border border-white/20">
-                <div className="text-white text-sm">
-                  Welcome back, <span className="font-semibold">{user.username}</span>
-                </div>
-                {getPremiumBadge()}
-              </div>
-            )}
+          <div className="fixed top-6 left-6 z-50">
+  <div className="relative">
+    {/* Glow Border */}
+    {isPremiumUser() && (
+      <div className="absolute -inset-1 rounded-xl bg-black glow-border -z-10"></div>
+    )}
 
-            {/* Personalized Discovery Button */}
-            <div className="relative">
-              <button
-                onClick={fetchPersonalizedFestivals}
-                disabled={personalizedLoading}
-                className={`relative px-8 py-4 rounded-xl font-bold text-lg shadow-2xl transition-all duration-300 transform hover:scale-105 ${
-                  isPremiumUser()
-                    ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-blue-600 text-white hover:from-pink-600 hover:via-purple-700 hover:to-blue-700'
-                    : 'bg-gradient-to-r from-gray-600 to-gray-700 text-gray-300 cursor-not-allowed'
-                } ${personalizedLoading ? 'opacity-60' : ''}`}
-              >
-                <div className="flex items-center space-x-3">
-                  {isPremiumUser() ? (
-                    <Sparkles className="h-6 w-6" />
-                  ) : (
-                    <Lock className="h-6 w-6" />
-                  )}
-                  <span>
-                    {personalizedLoading ? 'Discovering...' : '🎯 Discover For Me (Pro/Plus)'}
-                  </span>
-                  {isPremiumUser() && <Crown className="h-5 w-5 text-yellow-300" />}
-                </div>
-                
-                {/* Premium Glow Effect */}
-                {isPremiumUser() && (
-                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-pink-500 via-purple-600 to-blue-600 opacity-30 blur-lg -z-10 animate-pulse"></div>
-                )}
-              </button>
+    <button
+      onClick={fetchPersonalizedFestivals}
+      disabled={personalizedLoading}
+      className={`relative px-6 py-3 rounded-xl font-semibold text-base shadow-lg transition-all duration-300 transform hover:scale-105 hover:brightness-110
+        ${isPremiumUser()
+          ? 'bg-neutral-900 text-white border border-[#D4AF37]/50'
+          : 'bg-neutral-700 text-gray-300 cursor-not-allowed'
+        } ${personalizedLoading ? 'opacity-60' : ''}`}
+    >
+      <div className="flex items-center space-x-2">
+        {isPremiumUser() ? (
+          <Sparkles className="h-5 w-5 text-yellow-400" />
+        ) : (
+          <Lock className="h-5 w-5" />
+        )}
+        <span className="whitespace-nowrap">
+          {personalizedLoading ? 'Discovering...' : 'Discover For Me'}
+        </span>
+        {isPremiumUser() && (
+          <Crown className="h-4 w-4 text-yellow-500 opacity-90" />
+        )}
+      </div>
+    </button>
+  </div>
+</div>
 
-              {/* Lock Overlay for Non-Premium Users */}
-              {!isPremiumUser() && (
-                <div 
-                  className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm rounded-xl cursor-pointer"
-                  onClick={() => setShowPremiumModal(true)}
-                >
-                  <div className="text-center">
-                    <Lock className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                    <div className="text-xs text-gray-300 font-medium">Premium Feature</div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Error Display */}
-            {personalizedError && (
-              <div className="text-red-400 text-sm mt-2 max-w-xl text-center bg-red-900/20 border border-red-400/30 rounded-lg p-3">
-                {personalizedError}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Premium Modal - Same as OnboardingPage */}
@@ -951,47 +924,43 @@ const DiscoveryPage = () => {
               <Filter className="h-5 w-5 text-purple-400" />
               <span className="text-white font-medium">Quick Filters:</span>
             </div>
-            
+
             <button
               onClick={() => handleFilterChange('vibeFilter', filters.vibeFilter === 'positive' ? 'all' : 'positive')}
-              className={`px-4 py-2 rounded-lg transition-all ${
-                filters.vibeFilter === 'positive' 
-                  ? 'bg-green-600 text-white shadow-lg' 
-                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
-              }`}
+              className={`px-4 py-2 rounded-lg transition-all ${filters.vibeFilter === 'positive'
+                ? 'bg-green-600 text-white shadow-lg'
+                : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                }`}
             >
               🎉 Highly Rated
             </button>
-            
+
             <button
               onClick={() => handleFilterChange('month', filters.month === 'July' ? '' : 'July')}
-              className={`px-4 py-2 rounded-lg transition-all ${
-                filters.month === 'July' 
-                  ? 'bg-blue-600 text-white shadow-lg' 
-                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
-              }`}
+              className={`px-4 py-2 rounded-lg transition-all ${filters.month === 'July'
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                }`}
             >
               📅 July Events
             </button>
-            
+
             <button
               onClick={() => handleFilterChange('tags', filters.tags.includes('music') ? filters.tags.filter(t => t !== 'music') : [...filters.tags, 'music'])}
-              className={`px-4 py-2 rounded-lg transition-all ${
-                filters.tags.includes('music') 
-                  ? 'bg-purple-600 text-white shadow-lg' 
-                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
-              }`}
+              className={`px-4 py-2 rounded-lg transition-all ${filters.tags.includes('music')
+                ? 'bg-purple-600 text-white shadow-lg'
+                : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                }`}
             >
               🎵 Music
             </button>
 
             <button
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
-                showAdvancedFilters 
-                  ? 'bg-orange-600 text-white shadow-lg' 
-                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
-              }`}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${showAdvancedFilters
+                ? 'bg-orange-600 text-white shadow-lg'
+                : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                }`}
             >
               <SlidersHorizontal className="h-4 w-4" />
               <span>Advanced</span>
@@ -1099,11 +1068,10 @@ const DiscoveryPage = () => {
                     <button
                       key={tag}
                       onClick={() => handleTagToggle(tag)}
-                      className={`px-3 py-1 rounded-full text-sm transition-all capitalize ${
-                        filters.tags.includes(tag)
-                          ? 'bg-purple-600 text-white shadow-lg border-2 border-purple-400'
-                          : 'bg-white/10 text-gray-300 hover:bg-white/20 border border-white/20'
-                      }`}
+                      className={`px-3 py-1 rounded-full text-sm transition-all capitalize ${filters.tags.includes(tag)
+                        ? 'bg-purple-600 text-white shadow-lg border-2 border-purple-400'
+                        : 'bg-white/10 text-gray-300 hover:bg-white/20 border border-white/20'
+                        }`}
                     >
                       {tag}
                     </button>
@@ -1122,7 +1090,7 @@ const DiscoveryPage = () => {
               <span className="ml-2 text-sm">({activeFiltersCount} filter{activeFiltersCount !== 1 ? 's' : ''} applied)</span>
             )}
           </div>
-          
+
           {filters.search && (
             <div className="text-gray-300 text-sm">
               Searching for: <span className="text-purple-300 font-medium">"{filters.search}"</span>
@@ -1155,13 +1123,13 @@ const DiscoveryPage = () => {
                   <span className="text-white text-xs font-medium">{getVibeLabel(festival.vibe_score)}</span>
                 </div>
               </div>
-              
+
               <div className="p-6">
                 <h3 className="text-xl font-bold text-white mb-2 line-clamp-2">{festival.title || 'Untitled Festival'}</h3>
                 <p className="text-gray-300 mb-4 text-sm leading-relaxed">
                   {truncateContent(festival.content)}
                 </p>
-                
+
                 <div className="space-y-3 mb-6">
                   <div className="flex items-center space-x-2 text-gray-300">
                     <MapPin className="h-4 w-4 text-purple-400" />

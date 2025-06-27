@@ -1,3 +1,69 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes glowPulse {
+  0% {
+    box-shadow: 0 0 4px #d4af37, 0 0 8px #d4af37;
+    opacity: 0.7;
+  }
+  50% {
+    box-shadow: 0 0 8px #d4af37, 0 0 16px #d4af37;
+    opacity: 1;
+  }
+  100% {
+    box-shadow: 0 0 4px #d4af37, 0 0 8px #d4af37;
+    opacity: 0.7;
+  }
+}
+
+@keyframes glowScatter {
+  0% {
+    filter: drop-shadow(0 0 2px #d4af37);
+  }
+  25% {
+    filter: drop-shadow(2px -2px 400px #d4af37);
+  }
+  50% {
+    filter: drop-shadow(-2px 200px 6px #d4af37);
+  }
+  75% {
+    filter: drop-shadow(2px 2px 5px #d4af37);
+  }
+  100% {
+    filter: drop-shadow(0 0 200px #d4af37);
+  }
+}
+
+.glow-border {
+  animation: glowScatter 0.4s ease-in-out infinite alternate;
+}
+
+@keyframes subtleGlow {
+  0% {
+    box-shadow: 0 0 5px rgba(212, 175, 55, 0.4), 0 0 10px rgba(212, 175, 55, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.7), 0 0 25px rgba(212, 175, 55, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(212, 175, 55, 0.4), 0 0 10px rgba(212, 175, 55, 0.3);
+  }
+}
+
+@keyframes glowEffect {
+  0% {
+    box-shadow: 0 0 4px rgba(212, 175, 55, 0.5), 0 0 8px rgba(212, 175, 55, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(212, 175, 55, 0.8), 0 0 20px rgba(212, 175, 55, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 4px rgba(212, 175, 55, 0.5), 0 0 8px rgba(212, 175, 55, 0.4);
+  }
+}
+
+.glow-border {
+  animation: glowEffect 3s ease-in-out infinite;
+  border-radius: 0.75rem; /* rounded-xl */
+}
