@@ -22,6 +22,7 @@ const OrganizerPanel = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingFestival, setEditingFestival] = useState<Festival | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'archived'>('all');
   const [newFestival, setNewFestival] = useState({
     name: '',
@@ -287,6 +288,19 @@ const OrganizerPanel = () => {
     );
   }
 
+  const handleEditFestival = (festival: Festival) => {
+    setEditingId(festival.id);
+    setEditingFestival({
+      ...festival,
+      name: festival.name || '',
+      location: festival.location || '',
+      subreddit: festival.subreddit || '',
+      tags: festival.tags || [],
+      url: festival.url || '',
+      description: festival.description || ''
+    });
+  };
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -539,6 +553,169 @@ const OrganizerPanel = () => {
           </div>
         )}
 
+        {/* Edit Festival Form */}
+        {editingId && editingFestival && (
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-8 border border-white/20 animate-fadeIn">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white flex items-center space-x-2">
+                <Edit className="h-6 w-6 text-blue-400" />
+                <span>Edit Festival</span>
+              </h2>
+              <button
+                onClick={() => {
+                  setEditingId(null);
+                  setEditingFestival(null);
+                }}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-white font-medium mb-2">Festival Name</label>
+                <input
+                  type="text"
+                  value={editingFestival.name}
+                  onChange={(e) => setEditingFestival(prev => ({ ...prev!, name: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="Enter festival name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-white font-medium mb-2">Location</label>
+                <input
+                  type="text"
+                  value={editingFestival.location}
+                  onChange={(e) => setEditingFestival(prev => ({ ...prev!, location: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="City, State"
+                />
+              </div>
+
+              <div>
+                <label className="block text-white font-medium mb-2">Subreddit</label>
+                <input
+                  type="text"
+                  value={editingFestival.subreddit}
+                  onChange={(e) => setEditingFestival(prev => ({ ...prev!, subreddit: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="r/subredditname"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-white font-medium mb-2">URL (Optional)</label>
+                <input
+                  type="text"
+                  value={editingFestival.url || ''}
+                  onChange={(e) => setEditingFestival(prev => ({ ...prev!, url: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="https://example.com"
+                />
+              </div>
+              
+              <div className="md:col-span-2">
+                <label className="block text-white font-medium mb-2">Description (Optional)</label>
+                <textarea
+                  value={editingFestival.description || ''}
+                  onChange={(e) => setEditingFestival(prev => ({ ...prev!, description: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-[100px] resize-y"
+                  placeholder="Enter festival description"
+                />
+              </div>
+
+              <div>
+                <label className="block text-white font-medium mb-2">Status</label>
+                <select
+                  value={editingFestival.status}
+                  onChange={(e) => setEditingFestival(prev => ({ ...prev!, status: e.target.value as Festival['status'] }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="active">Active</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-white font-medium mb-2">Tags</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {editingFestival.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="flex items-center space-x-1 px-3 py-1 bg-purple-600/30 text-purple-200 rounded-full text-sm border border-purple-400/30"
+                    >
+                      <span>{tag}</span>
+                      <button
+                        onClick={() => {
+                          setEditingFestival(prev => ({
+                            ...prev!,
+                            tags: prev!.tags.filter(t => t !== tag)
+                          }));
+                        }}
+                        className="hover:text-red-300 transition-colors"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const value = e.currentTarget.value;
+                      if (value && !editingFestival.tags.includes(value)) {
+                        setEditingFestival(prev => ({
+                          ...prev!,
+                          tags: [...prev!.tags, value]
+                        }));
+                      }
+                      e.currentTarget.value = '';
+                    }
+                  }}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="Type tag and press Enter"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-4 mt-6">
+              <button
+                onClick={() => {
+                  setEditingId(null);
+                  setEditingFestival(null);
+                }}
+                className="px-6 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const updatedData = {
+                    name: editingFestival.name,
+                    location: editingFestival.location,
+                    subreddit: editingFestival.subreddit,
+                    tags: editingFestival.tags,
+                    url: editingFestival.url,
+                    description: editingFestival.description,
+                    status: editingFestival.status
+                  };
+                  handleUpdateFestival(editingId, updatedData);
+                }}
+                disabled={!editingFestival.name || !editingFestival.location || !editingFestival.subreddit || editingFestival.tags.length === 0}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Festivals List */}
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20 overflow-hidden">
           <div className="p-6 border-b border-white/20">
@@ -616,7 +793,7 @@ const OrganizerPanel = () => {
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => setEditingId(festival.id)}
+                          onClick={() => handleEditFestival(festival)}
                           className="p-2 hover:bg-blue-600/20 rounded-lg transition-colors group"
                           title="Edit Festival"
                         >
