@@ -479,7 +479,7 @@ const OrganizerAuth = () => {
                       disabled={isLoading}
                     />
                   </div>
-
+ 
                   <div>
                     <label className="block text-white font-medium mb-2 flex items-center space-x-2">
                       <Phone className="h-4 w-4 text-purple-400" />
