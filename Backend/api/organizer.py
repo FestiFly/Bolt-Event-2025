@@ -100,19 +100,54 @@ def organizer_login(request):
 def create_festival(request):
     if request.method == "POST":
         try:
+            # Process festival data
             data = json.loads(request.body)
             required = ["name", "location", "tags", "subreddit"]
+            
+            # Check for required fields
             if not all(data.get(k) for k in required):
-                return JsonResponse({"error": "Missing fields"}, status=400)
+                return JsonResponse({"error": "Missing required fields"}, status=400)
 
-            data["status"] = "pending"
-            data["source"] = "organizer"
-            data["dateAdded"] = datetime.utcnow()
+            # Get organizer info directly from payload
+            organizer_info = data.get("organizer", {})
+            
+            # Validate minimum organizer info if provided
+            if organizer_info and not organizer_info.get("username"):
+                return JsonResponse({"error": "Organizer info must include at least a username"}, status=400)
+            
+            # Create festival document with proper structure
+            festival_data = {
+                "title": data["name"],  # Use "title" instead of "name"
+                "location": data["location"],
+                "tags": data["tags"],
+                "url": data.get("url", ""),  # Optional field
+                "month": datetime.utcnow().strftime("%B"),  # Current month
+                "content": data.get("description", ""),  # Optional description
+                "fetched_at": datetime.utcnow(),
+                "source": "organizer",
+                "dateAdded": datetime.utcnow(),
+                "subreddit": data["subreddit"],
+                
+                # Add organizer information directly from payload
+                "organizer": organizer_info
+            }
 
-            db["festivals"].insert_one(data)
-            return JsonResponse({"message": "Festival created"}, status=201)
+            # Insert the festival
+            result = db["festivals"].insert_one(festival_data)
+            
+            # Return success response with the created festival ID
+            return JsonResponse({
+                "message": "Festival created successfully",
+                "festival_id": str(result.inserted_id)
+            }, status=201)
+            
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON data"}, status=400)
         except Exception as e:
+            print(f"Error creating festival: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
+    
+    return JsonResponse({"error": "Only POST method is allowed"}, status=405)
 
 @csrf_exempt
 def list_organizer_festivals(request):

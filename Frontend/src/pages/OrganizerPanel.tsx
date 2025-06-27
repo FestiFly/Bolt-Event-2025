@@ -77,24 +77,58 @@ const OrganizerPanel = () => {
   };
 
 
-    const handleAddFestival = async () => {
-    try {
-      const response = await fetch('http://127.0.0.1:8000/api/organizer/festival/create/', {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newFestival),
-      });
-      if (response.ok) {
-        fetchFestivals();
-        setNewFestival({ name: '', location: '', subreddit: '', tags: [] });
-        setShowAddForm(false);
-      } else {
-        alert("Failed to add festival.");
-      }
-    } catch (err) {
-      console.error(err);
+const handleAddFestival = async () => {
+  try {
+    // Get JWT token from cookies
+    const token = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('jwt='))
+      ?.split('=')[1];
+      
+    if (!token) {
+      alert("You are not authenticated. Please log in again.");
+      setIsAuthenticated(false);
+      return;
     }
-  };
+    
+    const response = await fetch('http://127.0.0.1:8000/api/organizer/festival/create/', {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        name: newFestival.name,
+        location: newFestival.location,
+        subreddit: newFestival.subreddit,
+        tags: newFestival.tags,
+        description: newFestival.description || `Festival in ${newFestival.location}`,
+        url: newFestival.url || ""
+      }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log("Festival created with ID:", data.festival_id);
+      fetchFestivals();
+      setNewFestival({ 
+        name: '', 
+        location: '', 
+        subreddit: '', 
+        tags: [],
+        description: '',
+        url: ''
+      });
+      setShowAddForm(false);
+    } else {
+      const error = await response.json();
+      alert(`Failed to add festival: ${error.error}`);
+    }
+  } catch (err) {
+    console.error("Error adding festival:", err);
+    alert("An error occurred while adding the festival.");
+  }
+};
 
 
     const handleDeleteFestival = async (id: string) => {

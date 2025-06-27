@@ -29,6 +29,7 @@ urlpatterns = [
     path('user/profile/', user_profile, name='user-profile'),
     path('user/update-profile/', update_profile, name='update-profile'),
     path('user/apply-referral/', apply_referral, name='apply-referral'),
+    path('user/google-auth/', google_auth, name='google-auth'),
 
 
     #test urls
