@@ -6,6 +6,7 @@ import Navigation from './components/Navigation';
 import OnboardingPage from './pages/OnboardingPage';
 import DiscoveryPage from './pages/DiscoveryPage';
 import TripPlannerPage from './pages/TripPlannerPage';
+import OrganizerAuth from './pages/OrganizerAuth';
 import OrganizerPanel from './pages/OrganizerPanel';
 import AuthPage from './pages/UserLogin';
 import ProfilePage from './pages/ProfilePage';
@@ -34,6 +35,17 @@ const isAuthenticated = (): boolean => {
   return !!(decodedToken && decodedToken.exp > Date.now() / 1000);
 };
 
+const isOrganizerAuthenticated = (): boolean => {
+  const organizerToken = localStorage.getItem('organizerToken');
+  const jwtToken = Cookies.get('jwt');
+  
+  // Check if organizer token exists and JWT is valid
+  if (!organizerToken || !jwtToken) return false;
+  
+  const decodedToken = decodeJWT(jwtToken);
+  return !!(decodedToken && decodedToken.exp > Date.now() / 1000);
+};
+
 const getToken = (): string | null => {
   const token = Cookies.get('jwt');
   return token === undefined ? null : token;
@@ -58,21 +70,37 @@ const setupAxiosInterceptors = (): void => {
     (response) => response,
     (error) => {
       if (error.response && error.response.status === 401) {
-        // Unauthorized - clear token and redirect to login
+        // Unauthorized - clear tokens and redirect appropriately
         Cookies.remove('jwt');
+        localStorage.removeItem('organizerToken');
         localStorage.removeItem('festifly_token'); // Clean up legacy
         localStorage.removeItem('festifly_user'); // Clean up legacy
-        window.location.href = '/auth';
+        
+        // Redirect based on current path
+        const currentPath = window.location.pathname;
+        if (currentPath.startsWith('/organizer')) {
+          window.location.href = '/organizer';
+        } else {
+          window.location.href = '/auth';
+        }
       }
       return Promise.reject(error);
     }
   );
 };
 
-// Protected route component
+// Protected route component for regular users
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   if (!isAuthenticated()) {
     return <Navigate to="/auth" replace />;
+  }
+  return children;
+};
+
+// Protected route component for organizers
+const OrganizerProtectedRoute = ({ children }: { children: JSX.Element }) => {
+  if (!isOrganizerAuthenticated()) {
+    return <Navigate to="/organizer" replace />;
   }
   return children;
 };
@@ -84,8 +112,19 @@ function App() {
   useEffect(() => {
     setupAxiosInterceptors();
     
-    // Just mark authentication check as complete
-    // The actual check is done by the ProtectedRoute component
+    // Clean up any expired tokens on app load
+    const token = Cookies.get('jwt');
+    if (token) {
+      const decodedToken = decodeJWT(token);
+      if (!decodedToken || decodedToken.exp <= Date.now() / 1000) {
+        // Token expired, clean up
+        Cookies.remove('jwt');
+        localStorage.removeItem('organizerToken');
+        localStorage.removeItem('festifly_token');
+        localStorage.removeItem('festifly_user');
+      }
+    }
+    
     setAuthChecked(true);
   }, []);
 
@@ -121,18 +160,24 @@ function App() {
       }}>
         <Navigation />
         <Routes>
+          {/* Public Routes */}
           <Route path="/" element={<OnboardingPage />} />
           <Route path="/discover" element={<DiscoveryPage />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/trip/:festivalId" element={<TripPlannerPage />} />
+          
+          {/* Organizer Routes */}
+          <Route path="/organizer" element={<OrganizerAuth />} />
           <Route 
-            path="/organizer" 
+            path="/organizer/panel" 
             element={
-              <ProtectedRoute>
+              <OrganizerProtectedRoute>
                 <OrganizerPanel />
-              </ProtectedRoute>
+              </OrganizerProtectedRoute>
             } 
           />
+          
+          {/* User Protected Routes */}
           <Route 
             path="/profile" 
             element={
@@ -141,6 +186,8 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          
+          {/* Catch all route */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <BoltBadge />
