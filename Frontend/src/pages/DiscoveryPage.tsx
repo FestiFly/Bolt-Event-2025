@@ -47,6 +47,8 @@ const DiscoveryPage = () => {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [userPremiumStatus, setUserPremiumStatus] = useState<any>(null);
   const [loadingPremiumStatus, setLoadingPremiumStatus] = useState(false);
+  const itemsPerPage = 12;
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [filters, setFilters] = useState<FilterState>({
     search: '',
@@ -396,6 +398,11 @@ const DiscoveryPage = () => {
     razor.open();
   };
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
+
+
   const handleSubscribeClick = (plan: "monthly" | "yearly") => {
     if (userPremiumStatus?.is_active && userPremiumStatus?.plan === plan) {
       alert(`You are already subscribed to the ${plan} plan!`);
@@ -644,6 +651,14 @@ const DiscoveryPage = () => {
     return filtered;
   }, [festivals, filters]);
 
+  const totalPages = Math.ceil(filteredAndSortedFestivals.length / itemsPerPage);
+
+  const currentFestivals = filteredAndSortedFestivals.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+
   const getRandomImage = () => {
     const images = [
       'https://images.pexels.com/photos/1105666/pexels-photo-1105666.jpeg',
@@ -694,52 +709,29 @@ const DiscoveryPage = () => {
     <div className="min-h-screen py-8 px-4" style={{ backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))" }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-4 items-center">
           <h1 className="text-4xl font-bold text-white mb-4 bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
             Festival Discoveries
           </h1>
-          <p className="text-gray-300 text-lg">
+          <div className='flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0 sm:space-x-4 mb-6'>
+            {user && (
+              <div className="flex items-center justify-between space-x-3 w-1/4 bg-white/10 backdrop-blur-lg rounded-lg px-4 py-2 border border-white/20">
+                <div className="text-white text-sm">
+                  Welcome back, <span className="font-semibold">{user.username}</span>
+                </div>
+                {getPremiumBadge()}
+              </div>
+            )}
+          </div>
+
+        </div>
+        <div className='flex flex-col sm:flex-row items-right justify-between ml-[1150px] mb-2'>
+          <p className="text-gray-300 text-xs">
             {searchParams?.location && `Near ${searchParams.location} • `}
             {searchParams?.startDate && `${searchParams.startDate} • `}
             {filteredAndSortedFestivals.length} of {festivals.length} festivals
           </p>
-
-          {/* User Status and Personalized Button */}
-          <div className="fixed top-6 left-6 z-50">
-  <div className="relative">
-    {/* Glow Border */}
-    {isPremiumUser() && (
-      <div className="absolute -inset-1 rounded-xl bg-black glow-border -z-10"></div>
-    )}
-
-    <button
-      onClick={fetchPersonalizedFestivals}
-      disabled={personalizedLoading}
-      className={`relative px-6 py-3 rounded-xl font-semibold text-base shadow-lg transition-all duration-300 transform hover:scale-105 hover:brightness-110
-        ${isPremiumUser()
-          ? 'bg-neutral-900 text-white border border-[#D4AF37]/50'
-          : 'bg-neutral-700 text-gray-300 cursor-not-allowed'
-        } ${personalizedLoading ? 'opacity-60' : ''}`}
-    >
-      <div className="flex items-center space-x-2">
-        {isPremiumUser() ? (
-          <Sparkles className="h-5 w-5 text-yellow-400" />
-        ) : (
-          <Lock className="h-5 w-5" />
-        )}
-        <span className="whitespace-nowrap">
-          {personalizedLoading ? 'Discovering...' : 'Discover For Me'}
-        </span>
-        {isPremiumUser() && (
-          <Crown className="h-4 w-4 text-yellow-500 opacity-90" />
-        )}
-      </div>
-    </button>
-  </div>
-</div>
-
         </div>
-
         {/* Premium Modal - Same as OnboardingPage */}
         {showPremiumModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -925,6 +917,7 @@ const DiscoveryPage = () => {
               <span className="text-white font-medium">Quick Filters:</span>
             </div>
 
+            {/* Filter Buttons */}
             <button
               onClick={() => handleFilterChange('vibeFilter', filters.vibeFilter === 'positive' ? 'all' : 'positive')}
               className={`px-4 py-2 rounded-lg transition-all ${filters.vibeFilter === 'positive'
@@ -971,6 +964,41 @@ const DiscoveryPage = () => {
               )}
             </button>
 
+            {/* ✅ User Status and Personalized Button aligned to right */}
+            <div className="ml-auto flex items-center gap-4">
+              <div className="relative">
+                {/* Glow Border */}
+                {isPremiumUser() && (
+                  <div className="absolute -inset-1 rounded-xl bg-black glow-border -z-10"></div>
+                )}
+
+                <button
+                  onClick={fetchPersonalizedFestivals}
+                  disabled={personalizedLoading}
+                  className={`relative px-6 py-3 rounded-xl font-semibold text-base shadow-lg transition-all duration-300 transform hover:scale-105 hover:brightness-110
+          ${isPremiumUser()
+                      ? 'bg-neutral-900 text-white border border-[#D4AF37]/50'
+                      : 'bg-neutral-700 text-gray-300 cursor-not-allowed'
+                    } ${personalizedLoading ? 'opacity-60' : ''}`}
+                >
+                  <div className="flex items-center space-x-2">
+                    {isPremiumUser() ? (
+                      <Sparkles className="h-5 w-5 text-yellow-400" />
+                    ) : (
+                      <Lock className="h-5 w-5" />
+                    )}
+                    <span className="whitespace-nowrap">
+                      {personalizedLoading ? 'Discovering...' : 'Discover For Me'}
+                    </span>
+                    {isPremiumUser() && (
+                      <Crown className="h-4 w-4 text-yellow-500 opacity-90" />
+                    )}
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Clear All Button */}
             {activeFiltersCount > 0 && (
               <button
                 onClick={clearAllFilters}
@@ -981,6 +1009,7 @@ const DiscoveryPage = () => {
               </button>
             )}
           </div>
+
 
           {/* Advanced Filters */}
           {showAdvancedFilters && (
@@ -1100,7 +1129,7 @@ const DiscoveryPage = () => {
 
         {/* Festival Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredAndSortedFestivals.map((festival, index) => (
+          {currentFestivals.map((festival, index) => (
             <div
               key={festival._id}
               className={`bg-white/10 backdrop-blur-lg rounded-2xl overflow-hidden shadow-2xl border-2 ${getVibeColor(festival.vibe_score)} hover:scale-105 transition-all duration-300`}
@@ -1182,6 +1211,33 @@ const DiscoveryPage = () => {
               </div>
             </div>
           ))}
+          <div className="flex justify-center items-center gap-4 mt-8 ml-[615px]">
+            <button
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className={`px-4 py-2 rounded-lg font-medium ${currentPage === 1 ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : 'bg-white/10 text-white hover:bg-white/20'}`}
+            >
+              Previous
+            </button>
+
+            {Array.from({ length: totalPages }, (_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentPage(index + 1)}
+                className={`px-3 py-1 rounded-lg text-sm font-semibold ${currentPage === index + 1 ? 'bg-purple-600 text-white' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}
+              >
+                {index + 1}
+              </button>
+            ))}
+
+            <button
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className={`px-4 py-2 rounded-lg font-medium ${currentPage === totalPages ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : 'bg-white/10 text-white hover:bg-white/20'}`}
+            >
+              Next
+            </button>
+          </div>
         </div>
 
         {/* No Results */}
