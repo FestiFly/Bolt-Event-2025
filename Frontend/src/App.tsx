@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
 import Cookies from 'js-cookie';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import Navigation from './components/Navigation';
 import OnboardingPage from './pages/OnboardingPage';
 import DiscoveryPage from './pages/DiscoveryPage';
@@ -11,6 +12,7 @@ import OrganizerPanel from './pages/OrganizerPanel';
 import AuthPage from './pages/UserLogin';
 import ProfilePage from './pages/ProfilePage';
 import BoltBadge from './components/BoltBadge';
+import BoltWaterMark from './components/BoltWaterMark';
 
 // JWT utility functions
 const decodeJWT = (token: string) => {
@@ -105,6 +107,9 @@ const OrganizerProtectedRoute = ({ children }: { children: JSX.Element }) => {
   return children;
 };
 
+// Google Client ID - replace with your actual Client ID
+const GOOGLE_CLIENT_ID = "417585596392-pvibn0rqis2ka0hjesis5k1imten2am8.apps.googleusercontent.com";
+
 function App() {
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -153,46 +158,49 @@ function App() {
   }
 
   return (
-    <Router>
-      <div style={{
-        minHeight: "100vh",
-        backgroundImage: "linear-gradient(to bottom right, rgb(17, 24, 39), rgb(88, 28, 135), rgb(49, 46, 129))"
-      }}>
-        <Navigation />
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<OnboardingPage />} />
-          <Route path="/discover" element={<DiscoveryPage />} />
-          <Route path="/auth" element={<AuthPage />} />
-          <Route path="/trip/:festivalId" element={<TripPlannerPage />} />
-          
-          {/* Organizer Routes */}
-          <Route path="/organizer" element={<OrganizerAuth />} />
-          <Route 
-            path="/organizer/panel" 
-            element={
-              <OrganizerProtectedRoute>
-                <OrganizerPanel />
-              </OrganizerProtectedRoute>
-            } 
-          />
-          
-          {/* User Protected Routes */}
-          <Route 
-            path="/profile" 
-            element={
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            } 
-          />
-          
-          {/* Catch all route */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-        <BoltBadge />
-      </div>
-    </Router>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <Router>
+        <div style={{
+          minHeight: "100vh",
+          backgroundImage: "linear-gradient(to bottom right, rgb(17, 24, 39), rgb(88, 28, 135), rgb(49, 46, 129))"
+        }}>
+          <Navigation />
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<OnboardingPage />} />
+            <Route path="/discover" element={<DiscoveryPage />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/trip/:festivalId" element={<TripPlannerPage />} />
+            
+            {/* Organizer Routes */}
+            <Route path="/organizer" element={<OrganizerAuth />} />
+            <Route 
+              path="/organizer/panel" 
+              element={
+                <OrganizerProtectedRoute>
+                  <OrganizerPanel />
+                </OrganizerProtectedRoute>
+              } 
+            />
+            
+            {/* User Protected Routes */}
+            <Route 
+              path="/profile" 
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* Catch all route */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+          <BoltBadge />
+          <BoltWaterMark />
+        </div>
+      </Router>
+    </GoogleOAuthProvider>
   );
 }
 

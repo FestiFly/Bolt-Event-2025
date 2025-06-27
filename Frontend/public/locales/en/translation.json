@@ -1,0 +1,12 @@
+{
+  "welcome": "Welcome to FestiFly!",
+  "discover": "Discover Festivals",
+  "home": "Home",
+  "logout": "Logout",
+  "login": "Login",
+  "organizer": "Organizer",
+  "organizer_login": "Organizer Login",
+  "view_profile": "View Profile",
+  "organizer_panel": "Organizer Panel",
+  "logout_organizer": "Logout from Organizer"
+}
