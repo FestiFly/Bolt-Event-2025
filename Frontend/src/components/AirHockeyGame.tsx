@@ -34,40 +34,57 @@ const AirHockeyGame = () => {
     let playerY = 120;
     let botY = 120;
 
+    // Goal dimensions
+    const goalWidth = 100;
+    const goalHeight = 60;
+
     const draw = () => {
       // Clear canvas
       ctx.fillStyle = '#1E1B4B';
       ctx.fillRect(0, 0, 400, 300);
 
-      // Draw center line
+      // Draw playing area
       ctx.strokeStyle = '#374151';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(20, 20, 360, 260);
+
+      // Draw center line
       ctx.setLineDash([5, 5]);
       ctx.beginPath();
-      ctx.moveTo(200, 0);
-      ctx.lineTo(200, 300);
+      ctx.moveTo(200, 20);
+      ctx.lineTo(200, 280);
       ctx.stroke();
       ctx.setLineDash([]);
+
+      // Draw center circle
+      ctx.beginPath();
+      ctx.arc(200, 150, 30, 0, Math.PI * 2);
+      ctx.stroke();
 
       // Draw goals
       ctx.strokeStyle = '#F59E0B';
       ctx.beginPath();
-      ctx.moveTo(0, 100);
-      ctx.lineTo(0, 200);
+      ctx.moveTo(0, (300 - goalHeight) / 2);
+      ctx.lineTo(20, (300 - goalHeight) / 2);
+      ctx.lineTo(20, (300 + goalHeight) / 2);
+      ctx.lineTo(0, (300 + goalHeight) / 2);
       ctx.stroke();
 
       ctx.strokeStyle = '#3B82F6';
       ctx.beginPath();
-      ctx.moveTo(400, 100);
-      ctx.lineTo(400, 200);
+      ctx.moveTo(400, (300 - goalHeight) / 2);
+      ctx.lineTo(380, (300 - goalHeight) / 2);
+      ctx.lineTo(380, (300 + goalHeight) / 2);
+      ctx.lineTo(400, (300 + goalHeight) / 2);
       ctx.stroke();
 
       // Draw player paddle
       ctx.fillStyle = '#FACC15';
-      ctx.fillRect(10, playerY, 10, 60);
+      ctx.fillRect(20, playerY, 10, 60);
 
       // Draw bot paddle
       ctx.fillStyle = '#22D3EE';
-      ctx.fillRect(380, botY, 10, 60);
+      ctx.fillRect(370, botY, 10, 60);
 
       // Draw ball
       ctx.beginPath();
@@ -79,10 +96,10 @@ const AirHockeyGame = () => {
       ctx.fillStyle = '#FACC15';
       ctx.font = 'bold 24px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText(playerScore.toString(), 100, 30);
+      ctx.fillText(playerScore.toString(), 100, 40);
 
       ctx.fillStyle = '#22D3EE';
-      ctx.fillText(botScore.toString(), 300, 30);
+      ctx.fillText(botScore.toString(), 300, 40);
 
       // Draw countdown if game hasn't started
       if (!gameStarted) {
@@ -111,13 +128,13 @@ const AirHockeyGame = () => {
         ball.y += ball.vy;
 
         // Bounce off top/bottom walls
-        if (ball.y <= ball.radius || ball.y >= 300 - ball.radius) {
+        if (ball.y <= 20 + ball.radius || ball.y >= 280 - ball.radius) {
           ball.vy = -ball.vy;
         }
 
         // Bounce off paddles with angle based on hit position
         // Player paddle collision
-        if (ball.x <= 20 + ball.radius && ball.y >= playerY && ball.y <= playerY + 60 && ball.vx < 0) {
+        if (ball.x <= 30 + ball.radius && ball.y >= playerY && ball.y <= playerY + 60 && ball.vx < 0) {
           ball.vx = Math.abs(ball.vx);
           // Add angle based on where ball hits paddle
           const hitPos = (ball.y - (playerY + 30)) / 30; // -1 to 1
@@ -125,7 +142,7 @@ const AirHockeyGame = () => {
         }
 
         // Bot paddle collision  
-        if (ball.x >= 380 - ball.radius && ball.y >= botY && ball.y <= botY + 60 && ball.vx > 0) {
+        if (ball.x >= 370 - ball.radius && ball.y >= botY && ball.y <= botY + 60 && ball.vx > 0) {
           ball.vx = -Math.abs(ball.vx);
           // Add angle based on where ball hits paddle
           const hitPos = (ball.y - (botY + 30)) / 30; // -1 to 1
@@ -143,18 +160,19 @@ const AirHockeyGame = () => {
           }
         }
         // Keep bot paddle in bounds
-        botY = Math.max(0, Math.min(240, botY));
+        botY = Math.max(20, Math.min(220, botY));
 
-        // Scoring
-        if (ball.x < 0) {
-          if (ball.y >= 100 && ball.y <= 200) {
+        // Scoring - ball goes past player paddle (bot scores)
+        if (ball.x < 20) {
+          if (ball.y >= (300 - goalHeight)/2 && ball.y <= (300 + goalHeight)/2) {
             setBotScore(prev => prev + 1);
           }
           resetBall();
         }
 
-        if (ball.x > 400) {
-          if (ball.y >= 100 && ball.y <= 200) {
+        // Scoring - ball goes past bot paddle (player scores)
+        if (ball.x > 380) {
+          if (ball.y >= (300 - goalHeight)/2 && ball.y <= (300 + goalHeight)/2) {
             setPlayerScore(prev => prev + 1);
           }
           resetBall();
@@ -209,7 +227,7 @@ const AirHockeyGame = () => {
     const handleMouseMove = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       playerY = e.clientY - rect.top - 30;
-      playerY = Math.max(0, Math.min(240, playerY));
+      playerY = Math.max(20, Math.min(220, playerY));
     };
 
     canvas.addEventListener('mousemove', handleMouseMove);
