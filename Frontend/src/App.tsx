@@ -13,6 +13,7 @@ import AuthPage from './pages/UserLogin';
 import ProfilePage from './pages/ProfilePage';
 import BoltBadge from './components/BoltBadge';
 import BoltWaterMark from './components/BoltWaterMark';
+import LangSelector from './components/LangSelector';
 
 // JWT utility functions
 const decodeJWT = (token: string) => {
@@ -198,6 +199,7 @@ function App() {
           </Routes>
           <BoltBadge />
           <BoltWaterMark />
+          <LangSelector />
         </div>
       </Router>
     </GoogleOAuthProvider>
