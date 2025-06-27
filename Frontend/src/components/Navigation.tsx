@@ -10,7 +10,7 @@ const Navigation = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   
   const isActive = (path: string) => {
     if (path === '/organizer') {
@@ -19,9 +19,6 @@ const Navigation = () => {
     return location.pathname === path;
   };
 
-  const changeLanguage = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    i18n.changeLanguage(e.target.value);
-  };
 
   // Decode JWT token to get user data
   const decodeJWT = (token: string) => {
@@ -144,12 +141,6 @@ const Navigation = () => {
         <Link to="/" style={{ display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none" }}>
           <Music size={32} color="#c084fc" />
           <span style={{ fontSize: "1.5rem", fontWeight: "bold", color: "white" }}>FestiFly</span>
-          <select onChange={changeLanguage} value={i18n.language} className="border rounded p-1 ml-2">
-            <option value="en">English</option>
-            <option value="ta">தமிழ்</option>
-            <option value="hi">हिंदी</option>
-          </select>
-
         </Link>
         
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
