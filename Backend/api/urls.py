@@ -12,6 +12,7 @@ urlpatterns = [
     path("enhance-festival-ai/", enhance_festival_ai, name="enhance_festival_ai"),
     path("generate-voice-briefing/", generate_voice_briefing, name="generate_voice_briefing"),
     path("generate-ai-video/", generate_ai_video, name="generate_ai_video"),
+    path('subscription/status/', subscription_status, name='subscription_status'),
 
     #organizer urls
     path('organizer/signup/', organizer_signup, name='organizer-signup'), 

@@ -837,3 +837,64 @@ def check_subscription_status(request):
         return JsonResponse({"error": "Token expired"}, status=401)
     except (jwt.InvalidTokenError, Exception) as e:
         return JsonResponse({"error": f"Invalid token: {str(e)}"}, status=401)
+
+@csrf_exempt
+def subscription_status(request):
+    """Get user subscription status and voice usage"""
+    if request.method != "GET":
+        return JsonResponse({"error": "Only GET method is allowed."}, status=405)
+    
+    # Verify token
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return JsonResponse({"error": "No token provided"}, status=401)
+    
+    token = auth_header.split(' ')[1]
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        user_id = payload.get("user_id")
+        
+        # Find user by ID
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            return JsonResponse({"error": "User not found"}, status=404)
+        
+        # Check if premium subscription has expired
+        updated_user = check_subscription_expiry(user)
+        
+        # Get premium status
+        premium = updated_user.get('premium', {})
+        is_active = premium.get('is_active', False)
+        plan = premium.get('plan')
+        expires_at = premium.get('expires_at')
+        voice_usage = updated_user.get('voice_usage', 0)
+        
+        # Calculate remaining usage based on plan
+        remaining_usage = None
+        if plan == 'yearly':
+            remaining_usage = None  # Unlimited
+        elif plan == 'monthly':
+            remaining_usage = max(0, 5 - voice_usage)
+        else:
+            remaining_usage = max(0, 2 - voice_usage)
+        
+        # Format expiry date if available
+        expiry_formatted = None
+        if expires_at:
+            expiry_formatted = expires_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+            
+        return JsonResponse({
+            "is_active": is_active,
+            "plan": plan,
+            "expires_at": expiry_formatted,
+            "voice_usage": voice_usage,
+            "remaining_usage": remaining_usage,
+            "is_expired": premium.get('expired', False),
+            "need_renewal": is_active == False and premium.get('expired', False)
+        })
+        
+    except jwt.ExpiredSignatureError:
+        return JsonResponse({"error": "Token expired"}, status=401)
+    except (jwt.InvalidTokenError, Exception) as e:
+        return JsonResponse({"error": f"Invalid token: {str(e)}"}, status=401)
