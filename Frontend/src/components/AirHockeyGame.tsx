@@ -1,226 +1,264 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const AirHockeyGame = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [score, setScore] = useState(0);
-  const [highScore, setHighScore] = useState(0);
-  const [gameReady, setGameReady] = useState(false);
-  const [gameActive, setGameActive] = useState(false);
+  const [playerScore, setPlayerScore] = useState(0);
+  const [botScore, setBotScore] = useState(0);
 
   useEffect(() => {
-    const canvas = canvasRef.current!;
-    const ctx = canvas.getContext('2d')!;
-    const W = canvas.width = 350; // Slightly smaller for loading screen
-    const H = canvas.height = 250;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    let playerY = H / 2 - 30;
-    let botY = H / 2 - 30;
-    const paddleHeight = 60;
-    const paddleWidth = 10;
+    // Set canvas size
+    canvas.width = 400;
+    canvas.height = 300;
 
+    // Simple ball object
     const ball = {
-      x: W / 2,
-      y: H / 2,
-      vx: 3, // Initial velocity added
-      vy: 2,  // Initial velocity added
-      radius: 8,
-      speed: 4,
+      x: 200,
+      y: 150,
+      vx: 0, // Start with no velocity
+      vy: 0,
+      radius: 8
     };
 
-    let botDelayCounter = 0;
-    let resetting = false;
-    let playerJustHit = false;
-    let animationFrameId: number;
+    // Game state
+    let gameStarted = false;
+    let countdown = 3;
+    let countdownInterval = null;
 
-    const resetBall = (serveToPlayer = false) => {
-      resetting = true;
-      ball.x = W / 2;
-      ball.y = H / 2;
-      ball.vx = serveToPlayer ? ball.speed : -ball.speed; // Set initial velocity immediately
-      ball.vy = (Math.random() - 0.5) * 2;
-      setGameReady(false);
-      playerJustHit = false;
+    // Simple player paddle
+    let playerY = 120;
+    let botY = 120;
 
-      setTimeout(() => {
-        resetting = false;
-        setGameReady(true);
-        setGameActive(true);
-      }, 1000);
-    };
-
-    const startGame = () => {
-      resetBall();
-    };
-
-    // Start the game immediately when component mounts
-    startGame();
-
-    const drawField = () => {
+    const draw = () => {
+      // Clear canvas
       ctx.fillStyle = '#1E1B4B';
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(0, 0, 400, 300);
 
       // Draw center line
       ctx.strokeStyle = '#374151';
       ctx.setLineDash([5, 5]);
       ctx.beginPath();
-      ctx.moveTo(W / 2, 0);
-      ctx.lineTo(W / 2, H);
+      ctx.moveTo(200, 0);
+      ctx.lineTo(200, 300);
       ctx.stroke();
       ctx.setLineDash([]);
-    };
 
-    const drawPaddles = () => {
+      // Draw goals
+      ctx.strokeStyle = '#F59E0B';
+      ctx.beginPath();
+      ctx.moveTo(0, 100);
+      ctx.lineTo(0, 200);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#3B82F6';
+      ctx.beginPath();
+      ctx.moveTo(400, 100);
+      ctx.lineTo(400, 200);
+      ctx.stroke();
+
+      // Draw player paddle
       ctx.fillStyle = '#FACC15';
-      ctx.fillRect(10, playerY, paddleWidth, paddleHeight);
-      
-      ctx.fillStyle = '#22D3EE';
-      ctx.fillRect(W - 20, botY, paddleWidth, paddleHeight);
-    };
+      ctx.fillRect(10, playerY, 10, 60);
 
-    const drawBall = () => {
+      // Draw bot paddle
+      ctx.fillStyle = '#22D3EE';
+      ctx.fillRect(380, botY, 10, 60);
+
+      // Draw ball
       ctx.beginPath();
       ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
       ctx.fillStyle = '#E879F9';
       ctx.fill();
-    };
 
-    const moveBall = () => {
-      if (!gameReady || resetting) return;
-      
-      ball.x += ball.vx;
-      ball.y += ball.vy;
+      // Draw score
+      ctx.fillStyle = '#FACC15';
+      ctx.font = 'bold 24px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(playerScore.toString(), 100, 30);
 
-      // Wall collision
-      if (ball.y - ball.radius <= 0 || ball.y + ball.radius >= H) {
-        ball.vy *= -0.95;
-        ball.y = ball.y - ball.radius <= 0 ? ball.radius : H - ball.radius;
-      }
-    };
+      ctx.fillStyle = '#22D3EE';
+      ctx.fillText(botScore.toString(), 300, 30);
 
-    const handlePaddleCollisions = () => {
-      // Player paddle collision
-      if (
-        ball.x - ball.radius <= 20 &&
-        ball.y >= playerY &&
-        ball.y <= playerY + paddleHeight &&
-        ball.vx < 0 &&
-        !playerJustHit
-      ) {
-        ball.vx = Math.abs(ball.vx) * 1.05;
-        const hitPos = (ball.y - playerY) / paddleHeight - 0.5;
-        ball.vy += hitPos * 3;
-        playerJustHit = true;
+      // Draw countdown if game hasn't started
+      if (!gameStarted) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, 400, 300);
         
-        setScore(prev => {
-          const newScore = prev + 1;
-          if (newScore > highScore) setHighScore(newScore);
-          return newScore;
-        });
-      }
-
-      if (ball.x > 50) playerJustHit = false;
-
-      // Bot paddle collision
-      if (
-        ball.x + ball.radius >= W - 20 &&
-        ball.y >= botY &&
-        ball.y <= botY + paddleHeight &&
-        ball.vx > 0
-      ) {
-        ball.vx = -Math.abs(ball.vx) * 1.02;
-        const hitPos = (ball.y - botY) / paddleHeight - 0.5;
-        ball.vy += hitPos * 2.5;
-      }
-    };
-
-    const moveBot = () => {
-      if (!gameReady || resetting) return;
-      
-      botDelayCounter++;
-      if (botDelayCounter > 5) {
-        const botSpeed = 3;
-        const targetY = ball.y - paddleHeight / 2;
-        const diff = targetY - botY;
-        const imperfection = (Math.random() - 0.5) * 15;
-        
-        if (Math.abs(diff) > 5) {
-          botY += diff > 0 
-            ? Math.min(botSpeed, diff) + imperfection 
-            : Math.max(-botSpeed, diff) + imperfection;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 48px Arial';
+        ctx.textAlign = 'center';
+        if (countdown > 0) {
+          ctx.fillText(countdown.toString(), 200, 170);
+        } else {
+          ctx.fillText('GO!', 200, 170);
         }
-        botDelayCounter = 0;
+        
+        ctx.font = '16px Arial';
+        ctx.fillText('Get Ready!', 200, 120);
       }
     };
 
-    const checkGoals = () => {
-      if (resetting) return;
-      
-      if (ball.x + ball.radius < 0) {
-        setScore(0);
-        resetBall(true);
-      }
+    const update = () => {
+      // Only move ball if game has started
+      if (gameStarted) {
+        // Move ball
+        ball.x += ball.vx;
+        ball.y += ball.vy;
 
-      if (ball.x - ball.radius > W) {
-        resetBall();
+        // Bounce off top/bottom walls
+        if (ball.y <= ball.radius || ball.y >= 300 - ball.radius) {
+          ball.vy = -ball.vy;
+        }
+
+        // Bounce off paddles with angle based on hit position
+        // Player paddle collision
+        if (ball.x <= 20 + ball.radius && ball.y >= playerY && ball.y <= playerY + 60 && ball.vx < 0) {
+          ball.vx = Math.abs(ball.vx);
+          // Add angle based on where ball hits paddle
+          const hitPos = (ball.y - (playerY + 30)) / 30; // -1 to 1
+          ball.vy += hitPos * 2;
+        }
+
+        // Bot paddle collision  
+        if (ball.x >= 380 - ball.radius && ball.y >= botY && ball.y <= botY + 60 && ball.vx > 0) {
+          ball.vx = -Math.abs(ball.vx);
+          // Add angle based on where ball hits paddle
+          const hitPos = (ball.y - (botY + 30)) / 30; // -1 to 1
+          ball.vy += hitPos * 2;
+        }
+
+        // Simple bot AI - follow ball with some delay
+        const botSpeed = 2;
+        const targetY = ball.y - 30;
+        if (Math.abs(targetY - botY) > 5) {
+          if (targetY > botY) {
+            botY += botSpeed;
+          } else {
+            botY -= botSpeed;
+          }
+        }
+        // Keep bot paddle in bounds
+        botY = Math.max(0, Math.min(240, botY));
+
+        // Scoring
+        if (ball.x < 0) {
+          if (ball.y >= 100 && ball.y <= 200) {
+            setBotScore(prev => prev + 1);
+          }
+          resetBall();
+        }
+
+        if (ball.x > 400) {
+          if (ball.y >= 100 && ball.y <= 200) {
+            setPlayerScore(prev => prev + 1);
+          }
+          resetBall();
+        }
       }
+    };
+
+    const resetBall = () => {
+      ball.x = 200;
+      ball.y = 150;
+      ball.vx = 0;
+      ball.vy = 0;
+      gameStarted = false;
+      countdown = 3;
+      
+      // Clear any existing countdown
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+      
+      startCountdown();
+    };
+
+    const startCountdown = () => {
+      // Clear any existing interval first
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+      }
+      
+      countdownInterval = setInterval(() => {
+        countdown--;
+        
+        if (countdown <= 0) {
+          clearInterval(countdownInterval);
+          countdownInterval = null;
+          
+          // Start the ball moving
+          ball.vx = Math.random() > 0.5 ? 3 : -3;
+          ball.vy = Math.random() * 4 - 2;
+          gameStarted = true;
+        }
+      }, 1000);
     };
 
     const gameLoop = () => {
-      drawField();
-      drawPaddles();
-      drawBall();
-      moveBall();
-      handlePaddleCollisions();
-      moveBot();
-      checkGoals();
-
-      // Clamp paddles to canvas bounds
-      playerY = Math.max(0, Math.min(H - paddleHeight, playerY));
-      botY = Math.max(0, Math.min(H - paddleHeight, botY));
-
-      animationFrameId = requestAnimationFrame(gameLoop);
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
     };
 
-    const movePlayer = (e: MouseEvent) => {
+    const handleMouseMove = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
-      playerY = e.clientY - rect.top - paddleHeight / 2;
+      playerY = e.clientY - rect.top - 30;
+      playerY = Math.max(0, Math.min(240, playerY));
     };
 
-    const handleClick = () => {
-      if (!gameActive) startGame();
-    };
-
-    canvas.addEventListener('mousemove', movePlayer);
-    canvas.addEventListener('click', handleClick);
+    canvas.addEventListener('mousemove', handleMouseMove);
+    
+    // Start the initial countdown
+    startCountdown();
+    
+    // Start the game loop
     gameLoop();
 
     return () => {
-      canvas.removeEventListener('mousemove', movePlayer);
-      canvas.removeEventListener('click', handleClick);
-      cancelAnimationFrame(animationFrameId);
+      canvas.removeEventListener('mousemove', handleMouseMove);
+      // Clean up countdown interval
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+      }
     };
-  }, [highScore]);
+  }, []);
 
   return (
-    <div className="flex flex-col items-center">
-      <canvas
-        ref={canvasRef}
-        style={{
-          border: '2px solid #4F46E5',
-          borderRadius: '8px',
-          backgroundColor: '#1E1B4B',
-          cursor: gameActive ? 'none' : 'pointer',
-        }}
-      />
-      <div className="mt-2 text-center">
-        <p className="text-white text-sm">
-          Score: <span className="font-bold text-yellow-300">{score}</span>
+    <div className="flex flex-col items-center bg-gray-900 p-6 rounded-lg shadow-xl">
+      <h2 className="text-3xl font-bold text-white mb-2">🏒 Air Hockey</h2>
+      <div className="relative">
+        <canvas
+          ref={canvasRef}
+          width={400}
+          height={300}
+          style={{
+            border: '4px solid #4F46E5',
+            borderRadius: '10px',
+            backgroundColor: '#1E1B4B',
+            cursor: 'none',
+            display: 'block',
+            boxShadow: '0 0 20px rgba(79, 70, 229, 0.5)'
+          }}
+        />
+      </div>
+      <div className="flex justify-between w-full mt-4 px-4">
+        <div className="text-center">
+          <p className="text-yellow-400 font-bold text-xl">Player: {playerScore}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-blue-400 font-bold text-xl">Bot: {botScore}</p>
+        </div>
+      </div>
+      <div className="mt-4 text-center">
+        <p className="text-gray-400 text-sm">
+          Move your mouse to control the yellow paddle
         </p>
-        {!gameActive && (
-          <p className="text-yellow-300 text-xs mt-1 animate-pulse">
-            Click to start!
-          </p>
-        )}
       </div>
     </div>
   );
