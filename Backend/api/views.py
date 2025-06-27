@@ -18,7 +18,12 @@ from duckduckgo_search import DDGS
 from bs4 import BeautifulSoup
 import time
 import random
+import jwt
+from django.conf import settings
+from datetime import datetime, timedelta
 
+# If SECRET_KEY isn't defined elsewhere, add this
+SECRET_KEY = 'FetiFly' 
 # MongoDB setup
 client = MongoClient('mongodb+srv://ihub:akash@ihub.fel24ru.mongodb.net/')
 db = client['festifly']
@@ -1159,6 +1164,23 @@ def get_all_festivals(request):
 def generate_voice_briefing(request):
     try:
         import base64
+        from bson.objectid import ObjectId
+        
+        # Verify user authentication and get user ID from token
+        auth_header = request.headers.get('Authorization', '')
+        user_id = None
+        plan = None
+        
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+            try:
+                payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+                user_id = payload.get("user_id")
+                plan = payload.get("plan")  # Get user plan from token
+            except:
+                return JsonResponse({"error": "Invalid or expired token"}, status=401)
+        else:
+            return JsonResponse({"error": "Authorization token required"}, status=401)
 
         data = json.loads(request.body)
         festival_id = data.get("_id")
@@ -1172,9 +1194,44 @@ def generate_voice_briefing(request):
         if not fest:
             return JsonResponse({"error": "Festival not found"}, status=404)
 
+        # Check if language is allowed for the plan
+        if language != "en" and not plan:
+            return JsonResponse({
+                "error": "Free users can only generate English voice briefings. Please upgrade to access other languages."
+            }, status=403)
+
+        # Get user's current voice usage count
+        user = None
+        if user_id:
+            user = db['users'].find_one({"_id": ObjectId(user_id)})
+            
+            if user:
+                # Check usage limits based on plan
+                voice_usage = user.get('voice_usage', 0)
+                
+                if plan == 'yearly':
+                    # Unlimited for yearly subscribers
+                    pass
+                elif plan == 'monthly' and voice_usage >= 5:
+                    return JsonResponse({
+                        "error": "You've reached your monthly limit of 5 voice generations. Please upgrade to our annual plan for unlimited access."
+                    }, status=403)
+                elif not plan and voice_usage >= 2:
+                    return JsonResponse({
+                        "error": "You've reached your free tier limit of 2 voice generations. Please upgrade to a premium plan."
+                    }, status=403)
+
         # ✅ Return cached voice data if available
         voice_data = fest.get("ai_voice_data", {})
         if language in voice_data and all(k in voice_data[language] for k in ["script", "blob"]):
+            # If authenticated and using cache, still increment usage for non-yearly users
+            if user_id and plan != 'yearly' and user:
+                db['users'].update_one(
+                    {"_id": ObjectId(user_id)},
+                    {"$inc": {"voice_usage": 1}}
+                )
+            
+            # Return cached data
             return JsonResponse({
                 "script": voice_data[language]["script"],
                 "audio_url": voice_data[language].get("url"),
@@ -1266,6 +1323,13 @@ def generate_voice_briefing(request):
                 }
             }}
         )
+
+        # Update user's voice usage count if not on yearly plan
+        if user_id and plan != 'yearly' and user:
+            db['users'].update_one(
+                {"_id": ObjectId(user_id)},
+                {"$inc": {"voice_usage": 1}}
+            )
 
         return JsonResponse({
             "script": final_script,

@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Edit2, Save, X, Camera, Loader, MapPin, Heart, Users, Copy, Check, AlertCircle, Crown, User, Settings } from "lucide-react";
+import { 
+  Mail, Edit2, Save, X, Camera, Loader, MapPin, Heart, Users, Copy, Check, AlertCircle, 
+  Crown, User, Settings, Calendar, Shield, Star, Gift, TrendingUp, Award, Clock,
+  CreditCard, Sparkles, UserPlus, ExternalLink, Bell, Globe, Volume2, Smartphone,
+  Monitor, Moon, Sun
+} from "lucide-react";
 import axios from "axios";
 import Cookies from "js-cookie";
 
@@ -10,54 +15,113 @@ const getAuthToken = (): string | null => {
 };
 
 const checkPremiumStatus = (user: any) => {
-  // Return a default structure if user is null or undefined
-  if (!user) {
+  if (!user || !user.premium) {
     return {
       isActive: false,
+      isPro: false,
       isPlus: false,
       plan: null,
-      expiresAt: null
+      expiresAt: null,
+      startedAt: null,
+      paymentId: null,
+      amount: null,
+      currency: null,
+      expired: false
     };
   }
 
-  // Make sure premium exists before accessing its properties
-  const premium = user.premium || {};
+  const premium = user.premium;
   
-  if (!premium.is_active) {
-    return {
-      isActive: false,
-      isPlus: false,
-      plan: null,
-      expiresAt: null
-    };
-  }
-
   return {
     isActive: premium.is_active || false,
-    isPlus: premium.plan === 'yearly',
+    isPro: premium.is_pro || false,
+    isPlus: premium.is_plus || false,
     plan: premium.plan || null,
-    expiresAt: premium.expires_at || null
+    expiresAt: premium.expires_at || null,
+    startedAt: premium.started_at || null,
+    paymentId: premium.payment_id || null,
+    amount: premium.amount || null,
+    currency: premium.currency || null,
+    expired: premium.expired || false
   };
 };
 
-const formatExpiryDate = (expiryDate: string | null): string => {
-  if (!expiryDate) return 'Never';
+const formatDateTime = (dateString: string | null): string => {
+  if (!dateString) return 'N/A';
   
   try {
-    const date = new Date(expiryDate);
-    return date.toLocaleDateString('en-US', {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-IN', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
-    });
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Kolkata',
+      timeZoneName: 'short'
+    }).format(date);
   } catch (error) {
-    return 'Invalid Date';
+    console.error('Error formatting date:', error);
+    return 'Invalid date';
+  }
+};
+
+const formatDateOnly = (dateString: string | null): string => {
+  if (!dateString) return 'N/A';
+  
+  try {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-IN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'Asia/Kolkata'
+    }).format(date);
+  } catch (error) {
+    return 'Invalid date';
+  }
+};
+
+const getRemainingTime = (expiryDate: string): string => {
+  if (!expiryDate) return '';
+
+  try {
+    const expiry = new Date(expiryDate);
+    const now = new Date();
+    const diffMs = expiry.getTime() - now.getTime();
+
+    if (diffMs <= 0) return 'Expired';
+
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+    if (days > 365) {
+      const years = Math.floor(days / 365);
+      const remainingDays = days % 365;
+      return `${years} year${years > 1 ? 's' : ''} ${remainingDays} day${remainingDays !== 1 ? 's' : ''} remaining`;
+    }
+
+    if (days > 30) {
+      const months = Math.floor(days / 30);
+      const remainingDays = days % 30;
+      return `${months} month${months > 1 ? 's' : ''} ${remainingDays} day${remainingDays !== 1 ? 's' : ''} remaining`;
+    }
+
+    if (days > 0) {
+      return `${days} day${days > 1 ? 's' : ''} ${hours} hr${hours !== 1 ? 's' : ''} remaining`;
+    }
+
+    return `${hours} hour${hours !== 1 ? 's' : ''} remaining`;
+  } catch (error) {
+    console.error('Error calculating remaining time:', error);
+    return '';
   }
 };
 
 const ProfilePage = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const [formData, setFormData] = useState({
@@ -73,6 +137,26 @@ const ProfilePage = () => {
   const [copySuccess, setCopySuccess] = useState(false);
   const [userLoading, setUserLoading] = useState(true);
   
+  // Preferences state
+  const [preferences, setPreferences] = useState({
+    notifications: {
+      email: true,
+      push: true,
+      sms: false,
+      marketing: true
+    },
+    privacy: {
+      profileVisibility: 'public',
+      showLocation: true,
+      showInterests: true
+    },
+    display: {
+      theme: 'dark',
+      language: 'en',
+      timezone: 'Asia/Kolkata'
+    }
+  });
+  
   const interestOptions = [
     'Music', 'Food', 'Art', 'Technology', 'Culture', 'Comedy',
     'Film', 'Literature', 'Sports', 'Gaming', 'Wellness', 'Dance'
@@ -81,22 +165,14 @@ const ProfilePage = () => {
   const premiumStatus = checkPremiumStatus(user);
 
   useEffect(() => {
-    // Check if user is authenticated
     const token = getAuthToken();
     if (!token) {
       navigate('/auth');
       return;
     }
     
-    // Fetch user data from API on component mount
     fetchUserProfile();
-    
-    // Then check subscription status (after a small delay to ensure user is loaded)
-    setTimeout(() => {
-      if (user) { // Only check if user exists
-        checkSubscriptionStatus();
-      }
-    }, 500);
+    fetchSubscriptionStatus();
   }, [navigate]);
 
   const fetchUserProfile = async () => {
@@ -130,7 +206,6 @@ const ProfilePage = () => {
     } catch (error: any) {
       console.error('Error fetching profile:', error);
       if (error.response?.status === 401) {
-        // Token expired or invalid, redirect to login
         Cookies.remove('jwt');
         navigate('/auth');
       }
@@ -139,15 +214,32 @@ const ProfilePage = () => {
     }
   };
 
+  const fetchSubscriptionStatus = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) return;
+      
+      const response = await axios.get('http://localhost:8000/api/subscription/status/', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data) {
+        setSubscriptionStatus(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching subscription status:', error);
+    }
+  };
+
   const calculateProfileCompletion = (userData: any) => {
     let completionScore = 0;
-    let totalFields = 5; // name, bio, location, preferences, profilePicture (not implemented yet)
+    let totalFields = 5;
     
     if (userData.name) completionScore += 1;
     if (userData.bio) completionScore += 1;
     if (userData.location) completionScore += 1;
     if (userData.preferences && userData.preferences.length > 0) completionScore += 1;
-    if (userData.profilePicture) completionScore += 1; // Not implemented yet
+    if (userData.profilePicture) completionScore += 1;
     
     setProfileCompletion(Math.round((completionScore / totalFields) * 100));
   };
@@ -210,77 +302,22 @@ const ProfilePage = () => {
     setTimeout(() => setCopySuccess(false), 2000);
   };
 
-  // Update the checkSubscriptionStatus function with proper null checks
-  const checkSubscriptionStatus = () => {
-    const token = getAuthToken();
-    if (!token) return;
-
-    setLoading(true);
-    fetch('http://localhost:8000/api/subscription/status/', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
+  const handlePreferenceChange = (category: string, key: string, value: any) => {
+    setPreferences(prev => ({
+      ...prev,
+      [category]: {
+        ...prev[category as keyof typeof prev],
+        [key]: value
       }
-    })
-    .then(res => res.json())
-    .then(data => {
-      console.log('Subscription status:', data);
-      
-      // If subscription has expired, update the local user object
-      if (data.is_expired && !data.is_active) {
-        setUser((prev: { premium: any; }) => {
-          // Make sure prev exists before updating
-          if (!prev) return prev;
-          
-          return {
-            ...prev,
-            premium: {
-              ...(prev.premium || {}), // Use empty object as fallback if premium is null
-              is_active: false,
-              expired: true
-            }
-          };
-        });
-        
-        // If needed, show renewal notification
-        if (data.need_renewal) {
-          // Add your notification code here
-        }
-      }
-    })
-    .catch(err => {
-      console.error('Error checking subscription status:', err);
-    })
-    .finally(() => {
-      setLoading(false);
-    });
+    }));
   };
-
-  // Add another useEffect to check subscription when user changes
-  useEffect(() => {
-    // Only check if user exists
-    if (user) {
-      checkSubscriptionStatus();
-    }
-  }, [user]); // This will run when the user object is updated
 
   if (userLoading) {
     return (
-      <div style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center"
-      }}>
-        <div style={{ 
-          display: "flex", 
-          flexDirection: "column", 
-          alignItems: "center", 
-          gap: "1rem",
-          color: "white" 
-        }}>
-          <Loader size={32} style={{ animation: "spin 1s linear infinite" }} />
-          <p>Loading profile...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900">
+        <div className="text-center">
+          <Loader className="h-12 w-12 text-purple-400 animate-spin mx-auto mb-4" />
+          <p className="text-white text-xl">Loading your profile...</p>
         </div>
       </div>
     );
@@ -288,30 +325,14 @@ const ProfilePage = () => {
 
   if (!user) {
     return (
-      <div style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center"
-      }}>
-        <div style={{ 
-          color: "white",
-          textAlign: "center"
-        }}>
-          <AlertCircle size={48} color="rgb(248, 113, 113)" style={{ margin: "0 auto 1rem" }} />
-          <h2>Unable to load profile</h2>
-          <p>Please try refreshing the page or logging in again.</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900">
+        <div className="text-center text-white">
+          <AlertCircle className="h-16 w-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Unable to load profile</h2>
+          <p className="text-gray-300 mb-6">Please try refreshing the page or logging in again.</p>
           <button 
             onClick={() => navigate('/auth')}
-            style={{
-              marginTop: "1rem",
-              padding: "0.75rem 1.5rem",
-              backgroundColor: "rgb(124, 58, 237)",
-              color: "white",
-              border: "none",
-              borderRadius: "0.5rem",
-              cursor: "pointer"
-            }}
+            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
           >
             Go to Login
           </button>
@@ -321,179 +342,167 @@ const ProfilePage = () => {
   }
 
   const renderProfileTab = () => (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-      <div>
-        <h3 style={{
-          fontSize: "1.125rem",
-          fontWeight: "500",
-          color: "white",
-          marginBottom: "0.5rem"
-        }}>About Me</h3>
-        <p style={{ color: "rgb(209, 213, 219)" }}>
-          {user.bio || "No bio available. Edit your profile to add a bio."}
-        </p>
-      </div>
-      
-      <div>
-        <h3 style={{
-          fontSize: "1.125rem",
-          fontWeight: "500",
-          color: "white",
-          marginBottom: "0.5rem"
-        }}>Location</h3>
-        <p style={{ color: "rgb(209, 213, 219)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <MapPin size={16} />
-          {user.location || "No location set"}
-        </p>
-      </div>
-      
-      <div>
-        <h3 style={{
-          fontSize: "1.125rem",
-          fontWeight: "500",
-          color: "white",
-          marginBottom: "0.5rem",
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem"
-        }}>
-          <Heart size={16} />
-          Interests
+    <div className="space-y-8">
+      {/* Personal Information */}
+      <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+        <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <User className="h-5 w-5 text-purple-400" />
+          Personal Information
         </h3>
+        
+        <div className="grid md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Full Name</label>
+            <p className="text-white text-lg">{user.name || 'Not set'}</p>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Username</label>
+            <p className="text-white text-lg">@{user.username}</p>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Email Address</label>
+            <p className="text-white text-lg flex items-center gap-2">
+              <Mail className="h-4 w-4 text-purple-400" />
+              {user.email}
+            </p>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Location</label>
+            <p className="text-white text-lg flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-purple-400" />
+              {user.location || 'Not set'}
+            </p>
+          </div>
+        </div>
+        
+        {user.bio && (
+          <div className="mt-6">
+            <label className="block text-sm font-medium text-gray-300 mb-2">Bio</label>
+            <p className="text-white leading-relaxed">{user.bio}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Interests */}
+      <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+        <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <Heart className="h-5 w-5 text-purple-400" />
+          Interests ({user.preferences?.length || 0})
+        </h3>
+        
         {user.preferences && user.preferences.length > 0 ? (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+          <div className="flex flex-wrap gap-3">
             {user.preferences.map((preference: string) => (
               <span
                 key={preference}
-                style={{
-                  backgroundColor: "rgba(124, 58, 237, 0.3)",
-                  color: "rgb(216, 180, 254)",
-                  padding: "0.25rem 0.75rem",
-                  borderRadius: "9999px",
-                  fontSize: "0.875rem",
-                  border: "1px solid rgba(139, 92, 246, 0.3)"
-                }}
+                className="px-4 py-2 bg-purple-600/20 text-purple-200 rounded-full text-sm border border-purple-400/30 font-medium"
               >
                 {preference}
               </span>
             ))}
           </div>
         ) : (
-          <p style={{ color: "rgb(209, 213, 219)" }}>
-            No interests set
-          </p>
+          <p className="text-gray-400">No interests set. Edit your profile to add some!</p>
         )}
       </div>
-      
-      <div>
-        <h3 style={{
-          fontSize: "1.125rem",
-          fontWeight: "500",
-          color: "white",
-          marginBottom: "0.5rem"
-        }}>Account Details</h3>
-        <div style={{
-          backgroundColor: "rgba(255, 255, 255, 0.05)",
-          borderRadius: "0.5rem",
-          padding: "1rem",
-          border: "1px solid rgba(255, 255, 255, 0.1)"
-        }}>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "1rem"
-          }}>
-            <div>
-              <p style={{ fontSize: "0.875rem", color: "rgb(156, 163, 175)" }}>Username</p>
-              <p style={{ color: "white" }}>{user.username}</p>
-            </div>
-            <div>
-              <p style={{ fontSize: "0.875rem", color: "rgb(156, 163, 175)" }}>Member Since</p>
-              <p style={{ color: "white" }}>{user.created_at ? new Date(user.created_at).toLocaleDateString() : "N/A"}</p>
-            </div>
+
+      {/* Account Statistics */}
+      <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+        <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <TrendingUp className="h-5 w-5 text-purple-400" />
+          Account Statistics
+        </h3>
+        
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-purple-400 mb-2">{profileCompletion}%</div>
+            <p className="text-gray-300 text-sm">Profile Complete</p>
           </div>
-           
+          
+          <div className="text-center">
+            <div className="text-3xl font-bold text-green-400 mb-2">{user.referrals?.length || 0}</div>
+            <p className="text-gray-300 text-sm">Successful Referrals</p>
+          </div>
+          
+          <div className="text-center">
+            <div className="text-3xl font-bold text-blue-400 mb-2">
+              {user.created_at ? Math.floor((Date.now() - new Date(user.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0}
+            </div>
+            <p className="text-gray-300 text-sm">Days as Member</p>
+          </div>
         </div>
       </div>
 
+      {/* Premium Status */}
       {renderPremiumStatus()}
+
+      {/* Referral Information */}
+      {user.referredBy && (
+        <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-xl p-6 border border-green-400/20">
+          <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <UserPlus className="h-5 w-5 text-green-400" />
+            Referred By
+          </h3>
+          
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center">
+              <span className="text-green-400 font-bold text-lg">
+                {user.referredBy.username?.charAt(0).toUpperCase() || 'U'}
+              </span>
+            </div>
+            <div>
+              <p className="text-white font-semibold">@{user.referredBy.username}</p>
+              <p className="text-gray-300 text-sm">
+                Referred you on {formatDateOnly(user.referredBy.date)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
   
   const renderProfileForm = () => (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-      <div>
-        <label style={{
-          display: "flex",
-          color: "white",
-          fontWeight: "500",
-          marginBottom: "0.5rem",
-          alignItems: "center",
-          gap: "0.5rem"
-        }}>
-          <User size={16} />
-          Name
-        </label>
-        <input
-          type="text"
-          name="name"
-          value={formData.name}
-          onChange={handleInputChange}
-          style={{
-            width: "100%",
-            padding: "0.75rem 1rem",
-            backgroundColor: "rgba(255, 255, 255, 0.1)",
-            border: "1px solid rgba(255, 255, 255, 0.2)",
-            borderRadius: "0.5rem",
-            color: "white",
-            outline: "none"
-          }}
-          placeholder="Your name"
-        />
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid md:grid-cols-2 gap-6">
+        <div>
+          <label className="block text-white font-medium mb-2 flex items-center gap-2">
+            <User className="h-4 w-4 text-purple-400" />
+            Full Name
+          </label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleInputChange}
+            className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            placeholder="Your full name"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-white font-medium mb-2 flex items-center gap-2">
+            <Mail className="h-4 w-4 text-purple-400" />
+            Email Address
+          </label>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            disabled
+            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-gray-400 cursor-not-allowed"
+            placeholder="Your email"
+          />
+        </div>
       </div>
       
       <div>
-        <label style={{
-          display: "flex",
-          color: "white",
-          fontWeight: "500",
-          marginBottom: "0.5rem",
-          alignItems: "center",
-          gap: "0.5rem"
-        }}>
-          <Mail size={16} />
-          Email
-        </label>
-        <input
-          type="email"
-          name="email"
-          value={formData.email}
-          onChange={handleInputChange}
-          disabled
-          style={{
-            width: "100%",
-            padding: "0.75rem 1rem",
-            backgroundColor: "rgba(255, 255, 255, 0.05)",
-            border: "1px solid rgba(255, 255, 255, 0.1)",
-            borderRadius: "0.5rem",
-            color: "rgb(156, 163, 175)",
-            outline: "none",
-            cursor: "not-allowed"
-          }}
-          placeholder="Your email"
-        />
-      </div>
-      
-      <div>
-        <label style={{
-          display: "flex",
-          color: "white",
-          fontWeight: "500",
-          marginBottom: "0.5rem",
-          alignItems: "center",
-          gap: "0.5rem"
-        }}>
-          <MapPin size={16} />
+        <label className="block text-white font-medium mb-2 flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-purple-400" />
           Location
         </label>
         <input
@@ -501,29 +510,14 @@ const ProfilePage = () => {
           name="location"
           value={formData.location}
           onChange={handleInputChange}
-          style={{
-            width: "100%",
-            padding: "0.75rem 1rem",
-            backgroundColor: "rgba(255, 255, 255, 0.1)",
-            border: "1px solid rgba(255, 255, 255, 0.2)",
-            borderRadius: "0.5rem",
-            color: "white",
-            outline: "none"
-          }}
-          placeholder="Your location"
+          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          placeholder="Your city, country"
         />
       </div>
       
       <div>
-        <label style={{
-          display: "flex",
-          color: "white",
-          fontWeight: "500",
-          marginBottom: "0.5rem",
-          alignItems: "center",
-          gap: "0.5rem"
-        }}>
-          <Heart size={16} />
+        <label className="block text-white font-medium mb-2 flex items-center gap-2">
+          <Heart className="h-4 w-4 text-purple-400" />
           Bio
         </label>
         <textarea
@@ -531,52 +525,27 @@ const ProfilePage = () => {
           value={formData.bio}
           onChange={handleInputChange}
           rows={4}
-          style={{
-            width: "100%",
-            padding: "0.75rem 1rem",
-            backgroundColor: "rgba(255, 255, 255, 0.1)",
-            border: "1px solid rgba(255, 255, 255, 0.2)",
-            borderRadius: "0.5rem",
-            color: "white",
-            outline: "none",
-            resize: "vertical"
-          }}
+          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-vertical"
           placeholder="Tell us about yourself..."
         />
       </div>
       
       <div>
-        <label style={{
-          display: "flex",
-          color: "white",
-          fontWeight: "500",
-          marginBottom: "0.5rem",
-          alignItems: "center",
-          gap: "0.5rem"
-        }}>
-          <Heart size={16} />
+        <label className="block text-white font-medium mb-3 flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-purple-400" />
           Interests
         </label>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "0.5rem" }}>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {interestOptions.map((interest) => (
             <button
               key={interest}
               type="button"
               onClick={() => handlePreferenceToggle(interest)}
-              style={{
-                padding: "0.5rem 0.75rem",
-                borderRadius: "0.5rem",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
-                backgroundColor: formData.preferences.includes(interest) 
-                  ? "rgba(124, 58, 237, 0.3)" 
-                  : "rgba(255, 255, 255, 0.1)",
-                color: formData.preferences.includes(interest) 
-                  ? "rgb(216, 180, 254)" 
-                  : "white",
-                cursor: "pointer",
-                transition: "all 0.2s",
-                fontSize: "0.875rem"
-              }}
+              className={`px-4 py-2 rounded-lg border transition-all text-sm font-medium ${
+                formData.preferences.includes(interest)
+                  ? 'bg-purple-600/30 text-purple-200 border-purple-400/50 shadow-lg'
+                  : 'bg-white/10 text-gray-300 border-white/20 hover:bg-white/20'
+              }`}
             >
               {interest}
             </button>
@@ -584,42 +553,25 @@ const ProfilePage = () => {
         </div>
       </div>
       
-      <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
+      <div className="flex gap-4 justify-end pt-6 border-t border-white/10">
         <button
           type="button"
           onClick={() => setIsEditing(false)}
-          style={{
-            padding: "0.75rem 1.5rem",
-            borderRadius: "0.5rem",
-            border: "1px solid rgba(255, 255, 255, 0.2)",
-            backgroundColor: "transparent",
-            color: "white",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem"
-          }}
+          className="px-6 py-3 bg-white/10 text-white border border-white/20 rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2"
         >
-          <X size={16} />
+          <X className="h-4 w-4" />
           Cancel
         </button>
         <button
           type="submit"
           disabled={loading}
-          style={{
-            padding: "0.75rem 1.5rem",
-            borderRadius: "0.5rem",
-            border: "none",
-            background: "linear-gradient(to right, rgb(124, 58, 237), rgb(37, 99, 235))",
-            color: "white",
-            cursor: loading ? "not-allowed" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            opacity: loading ? 0.7 : 1
-          }}
+          className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-lg"
         >
-          {loading ? <Loader size={16} style={{ animation: "spin 1s linear infinite" }} /> : <Save size={16} />}
+          {loading ? (
+            <Loader className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
           {loading ? "Saving..." : "Save Changes"}
         </button>
       </div>
@@ -627,158 +579,304 @@ const ProfilePage = () => {
   );
   
   const renderPreferencesTab = () => (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-      <h3 style={{ color: "white", marginBottom: "1rem" }}>Notification Preferences</h3>
-      <div style={{
-        backgroundColor: "rgba(255, 255, 255, 0.05)",
-        borderRadius: "0.5rem",
-        padding: "2rem",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
-        textAlign: "center"
-      }}>
-        <Settings size={48} color="rgb(156, 163, 175)" style={{ margin: "0 auto 1rem" }} />
-        <p style={{ color: "rgb(209, 213, 219)", fontSize: "1.125rem", marginBottom: "0.5rem" }}>
-          Notification Settings
-        </p>
-        <p style={{ color: "rgb(156, 163, 175)", fontSize: "0.875rem" }}>
-          Customize your notification preferences here. This feature is coming soon!
-        </p>
+    <div className="space-y-8">
+      {/* Notification Preferences */}
+      <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+        <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <Bell className="h-5 w-5 text-purple-400" />
+          Notification Preferences
+        </h3>
+        
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+            <div className="flex items-center gap-3">
+              <Mail className="h-5 w-5 text-blue-400" />
+              <div>
+                <p className="text-white font-medium">Email Notifications</p>
+                <p className="text-gray-400 text-sm">Receive updates about festivals and bookings via email</p>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={preferences.notifications.email}
+                onChange={(e) => handlePreferenceChange('notifications', 'email', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+            </label>
+          </div>
+          
+          <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+            <div className="flex items-center gap-3">
+              <Smartphone className="h-5 w-5 text-green-400" />
+              <div>
+                <p className="text-white font-medium">Push Notifications</p>
+                <p className="text-gray-400 text-sm">Get instant alerts on your device</p>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={preferences.notifications.push}
+                onChange={(e) => handlePreferenceChange('notifications', 'push', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+            </label>
+          </div>
+          
+          <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+            <div className="flex items-center gap-3">
+              <Volume2 className="h-5 w-5 text-yellow-400" />
+              <div>
+                <p className="text-white font-medium">Marketing Updates</p>
+                <p className="text-gray-400 text-sm">Receive news about new features and special offers</p>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={preferences.notifications.marketing}
+                onChange={(e) => handlePreferenceChange('notifications', 'marketing', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Privacy Settings */}
+      <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+        <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <Shield className="h-5 w-5 text-purple-400" />
+          Privacy Settings
+        </h3>
+        
+        <div className="space-y-4">
+          <div className="p-4 bg-white/5 rounded-lg">
+            <label className="block text-white font-medium mb-2">Profile Visibility</label>
+            <select
+              value={preferences.privacy.profileVisibility}
+              onChange={(e) => handlePreferenceChange('privacy', 'profileVisibility', e.target.value)}
+              className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="public" className="bg-gray-800">Public - Anyone can see your profile</option>
+              <option value="friends" className="bg-gray-800">Friends Only - Only your connections</option>
+              <option value="private" className="bg-gray-800">Private - Only you can see your profile</option>
+            </select>
+          </div>
+          
+          <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+            <div>
+              <p className="text-white font-medium">Show Location</p>
+              <p className="text-gray-400 text-sm">Display your location on your public profile</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={preferences.privacy.showLocation}
+                onChange={(e) => handlePreferenceChange('privacy', 'showLocation', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+            </label>
+          </div>
+          
+          <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+            <div>
+              <p className="text-white font-medium">Show Interests</p>
+              <p className="text-gray-400 text-sm">Display your interests on your public profile</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={preferences.privacy.showInterests}
+                onChange={(e) => handlePreferenceChange('privacy', 'showInterests', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Display Settings */}
+      <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+        <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <Monitor className="h-5 w-5 text-purple-400" />
+          Display Settings
+        </h3>
+        
+        <div className="space-y-4">
+          <div className="p-4 bg-white/5 rounded-lg">
+            <label className="block text-white font-medium mb-2 flex items-center gap-2">
+              {preferences.display.theme === 'dark' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+              Theme Preference
+            </label>
+            <select
+              value={preferences.display.theme}
+              onChange={(e) => handlePreferenceChange('display', 'theme', e.target.value)}
+              className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="dark" className="bg-gray-800">Dark Mode</option>
+              <option value="light" className="bg-gray-800">Light Mode</option>
+              <option value="auto" className="bg-gray-800">Auto (System)</option>
+            </select>
+          </div>
+          
+          <div className="p-4 bg-white/5 rounded-lg">
+            <label className="block text-white font-medium mb-2 flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              Language
+            </label>
+            <select
+              value={preferences.display.language}
+              onChange={(e) => handlePreferenceChange('display', 'language', e.target.value)}
+              className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="en" className="bg-gray-800">English</option>
+              <option value="hi" className="bg-gray-800">हिंदी (Hindi)</option>
+              <option value="ta" className="bg-gray-800">தமிழ் (Tamil)</option>
+              <option value="te" className="bg-gray-800">తెలుగు (Telugu)</option>
+              <option value="kn" className="bg-gray-800">ಕನ್ನಡ (Kannada)</option>
+            </select>
+          </div>
+          
+          <div className="p-4 bg-white/5 rounded-lg">
+            <label className="block text-white font-medium mb-2 flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Timezone
+            </label>
+            <select
+              value={preferences.display.timezone}
+              onChange={(e) => handlePreferenceChange('display', 'timezone', e.target.value)}
+              className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="Asia/Kolkata" className="bg-gray-800">India Standard Time (IST)</option>
+              <option value="Asia/Dubai" className="bg-gray-800">Gulf Standard Time (GST)</option>
+              <option value="UTC" className="bg-gray-800">Coordinated Universal Time (UTC)</option>
+              <option value="America/New_York" className="bg-gray-800">Eastern Time (ET)</option>
+              <option value="Europe/London" className="bg-gray-800">Greenwich Mean Time (GMT)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Save Preferences Button */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => {
+            // TODO: Save preferences to backend
+            console.log('Saving preferences:', preferences);
+          }}
+          className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all flex items-center gap-2 shadow-lg"
+        >
+          <Save className="h-4 w-4" />
+          Save Preferences
+        </button>
       </div>
     </div>
   );
   
   const renderReferralsTab = () => (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-      <div>
-        <h3 style={{ 
-          color: "white", 
-          marginBottom: "0.5rem",
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem"
-        }}>
-          <Users size={20} />
+    <div className="space-y-8">
+      {/* Referral Code Section */}
+      <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-xl p-6 border border-purple-400/20">
+        <h3 className="text-xl font-semibold text-white mb-2 flex items-center gap-2">
+          <Gift className="h-5 w-5 text-purple-400" />
           Your Referral Code
         </h3>
-        <p style={{ color: "rgb(156, 163, 175)", fontSize: "0.875rem", marginBottom: "1rem" }}>
-          Share this code with friends to earn rewards when they join FestiFly!
+        <p className="text-gray-300 text-sm mb-4">
+          Share this code with friends to earn rewards when they join FestiFly Premium!
         </p>
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          padding: "1rem",
-          backgroundColor: "rgba(255, 255, 255, 0.1)",
-          borderRadius: "0.5rem",
-          border: "1px solid rgba(255, 255, 255, 0.2)"
-        }}>
-          <code style={{ 
-            color: "rgb(216, 180, 254)", 
-            fontFamily: "monospace", 
-            flex: 1,
-            fontSize: "1.125rem",
-            fontWeight: "500"
-          }}>
+        
+        <div className="flex items-center gap-3 p-4 bg-white/10 rounded-lg border border-white/20">
+          <code className="flex-1 text-purple-300 font-mono text-lg font-bold tracking-wider">
             {referralCode}
           </code>
           <button
             onClick={copyReferralCode}
-            style={{
-              padding: "0.5rem",
-              backgroundColor: copySuccess ? "rgba(34, 197, 94, 0.2)" : "rgba(124, 58, 237, 0.2)",
-              border: `1px solid ${copySuccess ? "rgba(34, 197, 94, 0.3)" : "rgba(124, 58, 237, 0.3)"}`,
-              borderRadius: "0.375rem",
-              color: copySuccess ? "rgb(74, 222, 128)" : "rgb(216, 180, 254)",
-              cursor: "pointer",
-              transition: "all 0.2s"
-            }}
+            className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+              copySuccess 
+                ? 'bg-green-600/20 text-green-300 border border-green-400/30' 
+                : 'bg-purple-600/20 text-purple-300 border border-purple-400/30 hover:bg-purple-600/30'
+            }`}
           >
-            {copySuccess ? <Check size={16} /> : <Copy size={16} />}
+            {copySuccess ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            {copySuccess ? 'Copied!' : 'Copy'}
           </button>
         </div>
+        
         {copySuccess && (
-          <p style={{ 
-            color: "rgb(74, 222, 128)", 
-            fontSize: "0.875rem", 
-            marginTop: "0.5rem",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.25rem"
-          }}>
-            <Check size={14} />
+          <p className="text-green-400 text-sm mt-2 flex items-center gap-1">
+            <Check className="h-3 w-3" />
             Referral code copied to clipboard!
           </p>
         )}
       </div>
-      
-      {user.referrals && user.referrals.length > 0 && (
-        <div>
-          <h3 style={{ 
-            color: "white", 
-            marginBottom: "1rem",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem"
-          }}>
-            <Users size={20} />
-            Successful Referrals ({user.referrals.length})
+
+      {/* Referral Statistics */}
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="bg-white/5 rounded-xl p-6 border border-white/10 text-center">
+          <div className="text-3xl font-bold text-green-400 mb-2">{user.referrals?.length || 0}</div>
+          <p className="text-gray-300">Successful Referrals</p>
+        </div>
+        
+        <div className="bg-white/5 rounded-xl p-6 border border-white/10 text-center">
+          <div className="text-3xl font-bold text-purple-400 mb-2">₹{(user.referrals?.length || 0) * 50}</div>
+          <p className="text-gray-300">Rewards Earned</p>
+        </div>
+      </div>
+
+      {/* Referral History */}
+      {user.referrals && user.referrals.length > 0 ? (
+        <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+          <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <Users className="h-5 w-5 text-purple-400" />
+            Referral History ({user.referrals.length})
           </h3>
-          <div style={{ 
-            display: "grid", 
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", 
-            gap: "1rem" 
-          }}>
+          
+          <div className="space-y-4">
             {user.referrals.map((referral: any, index: number) => (
               <div
                 key={index}
-                style={{
-                  backgroundColor: "rgba(34, 197, 94, 0.1)",
-                  border: "1px solid rgba(34, 197, 94, 0.3)",
-                  borderRadius: "0.75rem",
-                  padding: "1rem",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem"
-                }}
+                className="flex items-center gap-4 p-4 bg-green-500/10 rounded-lg border border-green-400/20"
               >
-                <div style={{
-                  width: "2.5rem",
-                  height: "2.5rem",
-                  borderRadius: "9999px",
-                  backgroundColor: "rgba(34, 197, 94, 0.3)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "1rem",
-                  color: "rgb(74, 222, 128)",
-                  fontWeight: "600"
-                }}>
-                  {referral.username ? referral.username.charAt(0).toUpperCase() : "U"}
+                <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <span className="text-green-400 font-bold text-lg">
+                    {referral.username?.charAt(0).toUpperCase() || 'U'}
+                  </span>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ 
-                    color: "rgb(74, 222, 128)", 
-                    fontSize: "1rem", 
-                    fontWeight: "500",
-                    margin: "0 0 0.25rem 0" 
-                  }}>
-                    {referral.username || "Unknown User"}
+                <div className="flex-1">
+                  <p className="text-white font-semibold">@{referral.username || 'Unknown User'}</p>
+                  <p className="text-gray-300 text-sm">
+                    Joined on {formatDateOnly(referral.date)}
                   </p>
-                  <p style={{ 
-                    color: "rgb(156, 163, 175)", 
-                    fontSize: "0.875rem",
-                    margin: 0 
-                  }}>
-                    Joined on {referral.date ? new Date(referral.date).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    }) : "Unknown date"}
-                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-green-400 font-bold">+₹50</div>
+                  <div className="text-gray-400 text-xs">Reward</div>
                 </div>
               </div>
             ))}
           </div>
+        </div>
+      ) : (
+        <div className="bg-white/5 rounded-xl p-8 border border-white/10 text-center">
+          <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-white mb-2">No Referrals Yet</h3>
+          <p className="text-gray-400 mb-6">
+            Start sharing your referral code to earn rewards when friends join FestiFly!
+          </p>
+          <button
+            onClick={copyReferralCode}
+            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 mx-auto"
+          >
+            <Copy className="h-4 w-4" />
+            Copy Referral Code
+          </button>
         </div>
       )}
     </div>
@@ -787,237 +885,213 @@ const ProfilePage = () => {
   const renderPremiumStatus = () => {
     if (!premiumStatus.isActive) {
       return (
-        <div style={{
-          backgroundColor: "rgba(124, 58, 237, 0.1)",
-          border: "1px solid rgba(124, 58, 237, 0.3)",
-          borderRadius: "0.5rem",
-          padding: "1rem",
-          textAlign: "center"
-        }}>
-          <Crown size={24} color="rgb(216, 180, 254)" style={{ margin: "0 auto 0.5rem" }} />
-          <h4 style={{ color: "rgb(216, 180, 254)", marginBottom: "0.5rem" }}>Upgrade to Premium</h4>
-          <p style={{ color: "rgb(209, 213, 219)", fontSize: "0.875rem", marginBottom: "1rem" }}>
-            Get access to exclusive features and priority support
-          </p>
-          <button
-            onClick={() => {
-              // Navigate to onboarding page and open premium modal
-              navigate('/?openPremium=true');
-            }}
-            style={{
-              backgroundColor: "rgb(124, 58, 237)",
-              color: "white",
-              border: "none",
-              borderRadius: "0.375rem",
-              padding: "0.5rem 1rem",
-              fontSize: "0.875rem",
-              fontWeight: "500",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              cursor: "pointer",
-              transition: "all 0.2s",
-            }}
-          >
-            <Crown size={16} />
-            View Premium Plans
-          </button>
+        <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-xl p-6 border border-purple-400/20">
+          <div className="text-center">
+            <Crown className="h-12 w-12 text-purple-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">Upgrade to Premium</h3>
+            <p className="text-gray-300 mb-6">
+              Unlock exclusive features, priority support, and personalized recommendations
+            </p>
+            <button
+              onClick={() => navigate('/?openPremium=true')}
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all flex items-center gap-2 mx-auto shadow-lg"
+            >
+              <Crown className="h-4 w-4" />
+              View Premium Plans
+            </button>
+          </div>
         </div>
       );
     }
     
     return (
-      <div style={{
-        backgroundColor: "rgba(34, 197, 94, 0.1)",
-        border: "1px solid rgba(34, 197, 94, 0.3)",
-        borderRadius: "0.5rem",
-        padding: "1rem"
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-          <Crown size={20} color="rgb(74, 222, 128)" />
-          <h4 style={{ color: "rgb(74, 222, 128)" }}>Premium Member</h4>
+      <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-xl p-6 border border-yellow-400/20">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-yellow-500/20 rounded-lg">
+              <Crown className="h-6 w-6 text-yellow-400" />
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                Premium Member
+                {premiumStatus.isPlus && (
+                  <span className="px-2 py-1 bg-yellow-500/20 text-yellow-300 text-xs rounded-full border border-yellow-400/30">
+                    PLUS
+                  </span>
+                )}
+              </h3>
+              <p className="text-gray-300 text-sm">
+                {premiumStatus.plan?.charAt(0).toUpperCase() + premiumStatus.plan?.slice(1)} Plan
+              </p>
+            </div>
+          </div>
+          
+          <div className="text-right">
+            <div className="text-yellow-400 font-bold text-lg">
+              ₹{premiumStatus.amount}
+            </div>
+            <div className="text-gray-400 text-xs">{premiumStatus.currency}</div>
+          </div>
         </div>
-        <p style={{ color: "rgb(209, 213, 219)", fontSize: "0.875rem" }}>
-          Plan: {premiumStatus.plan} • Expires: {formatExpiryDate(premiumStatus.expiresAt)}
-        </p>
+        
+        <div className="grid md:grid-cols-2 gap-4 mb-4">
+          <div className="bg-white/5 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Calendar className="h-4 w-4 text-purple-400" />
+              <span className="text-sm text-gray-300">Started</span>
+            </div>
+            <p className="text-white font-medium">{formatDateOnly(premiumStatus.startedAt)}</p>
+          </div>
+          
+          <div className="bg-white/5 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="h-4 w-4 text-purple-400" />
+              <span className="text-sm text-gray-300">Expires</span>
+            </div>
+            <p className="text-white font-medium">{formatDateOnly(premiumStatus.expiresAt)}</p>
+          </div>
+        </div>
+        
+        <div className="bg-white/5 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-green-400" />
+              <span className="text-sm text-gray-300">Status</span>
+            </div>
+            <div className="text-right">
+              <div className="text-green-400 font-medium">
+                {getRemainingTime(premiumStatus.expiresAt)}
+              </div>
+              {premiumStatus.paymentId && (
+                <div className="text-gray-400 text-xs">
+                  Payment ID: {premiumStatus.paymentId.slice(-8)}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-4 pt-4 border-t border-white/10">
+          <button
+            onClick={() => navigate('/?openPremium=true')}
+            className="w-full px-4 py-2 bg-white/10 text-white border border-white/20 rounded-lg hover:bg-white/20 transition-colors flex items-center justify-center gap-2"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Manage Subscription
+          </button>
+        </div>
       </div>
     );
   };
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      padding: "3rem 1rem",
-      background: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
-    }}>
-      <div style={{ maxWidth: "4xl", margin: "0 auto" }}>
+    <div className="min-h-screen py-8 px-4 bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900">
+      <div className="max-w-6xl mx-auto">
         {/* Profile Header */}
-        <div style={{
-          backgroundColor: "rgba(255, 255, 255, 0.1)",
-          backdropFilter: "blur(16px)",
-          borderRadius: "1rem",
-          padding: "2rem",
-          marginBottom: "2rem",
-          border: "1px solid rgba(255, 255, 255, 0.2)"
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-              <div style={{
-                height: "4rem",
-                width: "4rem",
-                borderRadius: "9999px",
-                background: "linear-gradient(to bottom right, rgb(124, 58, 237), rgb(37, 99, 235))",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                position: "relative"
-              }}>
-                <span style={{ fontSize: "1.5rem", fontWeight: "bold", color: "white" }}>
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-8 border border-white/20">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="flex items-center gap-6">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-2xl font-bold text-white shadow-lg">
                   {user.name ? user.name.charAt(0).toUpperCase() : user.username?.charAt(0).toUpperCase() || "U"}
-                </span>
-                <button style={{
-                  position: "absolute",
-                  bottom: "-0.25rem",
-                  right: "-0.25rem",
-                  backgroundColor: "rgba(255, 255, 255, 0.2)",
-                  border: "none",
-                  borderRadius: "9999px",
-                  padding: "0.25rem",
-                  cursor: "pointer",
-                  opacity: 0
-                }}>
-                  <Camera size={14} color="white" />
+                </div>
+                <button className="absolute -bottom-1 -right-1 p-2 bg-white/20 rounded-full border border-white/30 hover:bg-white/30 transition-colors opacity-0 hover:opacity-100">
+                  <Camera className="h-3 w-3 text-white" />
                 </button>
               </div>
+              
               <div>
-                <h1 style={{ fontSize: "1.875rem", fontWeight: "bold", color: "white", marginBottom: "0.25rem" }}>
+                <h1 className="text-3xl font-bold text-white mb-1">
                   {user.name || user.username}
                 </h1>
-                <p style={{ color: "rgb(156, 163, 175)" }}>{user.email}</p>
-                <div style={{
-                  marginTop: "0.5rem",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem"
-                }}>
-                  <div style={{
-                    backgroundColor: "rgba(124, 58, 237, 0.2)",
-                    borderRadius: "9999px",
-                    padding: "0.25rem 0.75rem",
-                    fontSize: "0.75rem",
-                    color: "rgb(216, 180, 254)"
-                  }}>
-                    {profileCompletion}% Complete
+                <p className="text-gray-300 mb-3 flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  {user.email}
+                </p>
+                
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2 bg-purple-600/20 text-purple-200 px-3 py-1 rounded-full border border-purple-400/30">
+                    <TrendingUp className="h-3 w-3" />
+                    <span className="text-sm font-medium">{profileCompletion}% Complete</span>
                   </div>
+                  
                   {premiumStatus.isActive && (
-                    <div style={{
-                      backgroundColor: "rgba(34, 197, 94, 0.2)",
-                      borderRadius: "9999px",
-                      padding: "0.25rem 0.75rem",
-                      fontSize: "0.75rem",
-                      color: "rgb(74, 222, 128)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.25rem"
-                    }}>
-                      <Crown size={12} />
-                      Premium
+                    <div className="flex items-center gap-2 bg-yellow-500/20 text-yellow-300 px-3 py-1 rounded-full border border-yellow-400/30">
+                      <Crown className="h-3 w-3" />
+                      <span className="text-sm font-medium">
+                        {premiumStatus.isPlus ? 'Premium Plus' : 'Premium'}
+                      </span>
                     </div>
                   )}
+                  
+                  <div className="flex items-center gap-2 bg-blue-600/20 text-blue-200 px-3 py-1 rounded-full border border-blue-400/30">
+                    <Calendar className="h-3 w-3" />
+                    <span className="text-sm">
+                      Joined {formatDateOnly(user.created_at)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
             
             <button
               onClick={() => setIsEditing(!isEditing)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                padding: "0.75rem 1rem",
-                backgroundColor: isEditing ? "rgba(220, 38, 38, 0.2)" : "rgba(124, 58, 237, 0.2)",
-                border: `1px solid ${isEditing ? "rgba(248, 113, 113, 0.3)" : "rgba(139, 92, 246, 0.3)"}`,
-                borderRadius: "0.5rem",
-                color: isEditing ? "rgb(248, 113, 113)" : "rgb(216, 180, 254)",
-                cursor: "pointer",
-                fontSize: "0.875rem",
-                fontWeight: "500"
-              }}
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all shadow-lg ${
+                isEditing 
+                  ? 'bg-red-600/20 text-red-200 border border-red-400/30 hover:bg-red-600/30' 
+                  : 'bg-purple-600/20 text-purple-200 border border-purple-400/30 hover:bg-purple-600/30'
+              }`}
             >
-              {isEditing ? <X size={16} /> : <Edit2 size={16} />}
-              {isEditing ? "Cancel" : "Edit Profile"}
+              {isEditing ? <X className="h-4 w-4" /> : <Edit2 className="h-4 w-4" />}
+              {isEditing ? "Cancel Edit" : "Edit Profile"}
             </button>
           </div>
           
           {/* Progress Bar */}
-          <div style={{
-            backgroundColor: "rgba(255, 255, 255, 0.1)",
-            borderRadius: "9999px",
-            height: "0.5rem",
-            overflow: "hidden"
-          }}>
-            <div style={{
-              backgroundColor: "rgb(124, 58, 237)",
-              height: "100%",
-              width: `${profileCompletion}%`,
-              transition: "width 0.3s ease"
-            }} />
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-gray-300">Profile Completion</span>
+              <span className="text-sm text-purple-300 font-medium">{profileCompletion}%</span>
+            </div>
+            <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-500 ease-out"
+                style={{ width: `${profileCompletion}%` }}
+              />
+            </div>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div style={{
-          backgroundColor: "rgba(255, 255, 255, 0.1)",
-          backdropFilter: "blur(16px)",
-          borderRadius: "1rem",
-          border: "1px solid rgba(255, 255, 255, 0.2)",
-          overflow: "hidden"
-        }}>
-          <div style={{
-            display: "flex",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.1)"
-          }}>
-            {['profile', 'preferences', 'referrals'].map((tab) => (
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20 overflow-hidden">
+          <div className="flex border-b border-white/10">
+            {[
+              { id: 'profile', label: 'Profile', icon: User },
+              { id: 'preferences', label: 'Preferences', icon: Settings },
+              { id: 'referrals', label: 'Referrals', icon: Users }
+            ].map((tab) => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  flex: 1,
-                  padding: "1rem",
-                  backgroundColor: activeTab === tab ? "rgba(124, 58, 237, 0.2)" : "transparent",
-                  border: "none",
-                  color: activeTab === tab ? "rgb(216, 180, 254)" : "rgb(209, 213, 219)",
-                  cursor: "pointer",
-                  textTransform: "capitalize",
-                  fontWeight: "500",
-                  borderBottom: activeTab === tab ? "2px solid rgb(124, 58, 237)" : "2px solid transparent"
-                }}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 font-medium transition-all ${
+                  activeTab === tab.id
+                    ? 'bg-purple-600/20 text-purple-200 border-b-2 border-purple-400'
+                    : 'text-gray-300 hover:text-white hover:bg-white/5'
+                }`}
               >
-                {tab === 'profile' && <User size={16} style={{ marginRight: "0.5rem", display: "inline" }} />}
-                {tab === 'preferences' && <Settings size={16} style={{ marginRight: "0.5rem", display: "inline" }} />}
-                {tab === 'referrals' && <Users size={16} style={{ marginRight: "0.5rem", display: "inline" }} />}
-                {tab}
+                <tab.icon className="h-4 w-4" />
+                {tab.label}
               </button>
             ))}
           </div>
           
-          <div style={{ padding: "2rem" }}>
+          <div className="p-8">
             {activeTab === 'profile' && (isEditing ? renderProfileForm() : renderProfileTab())}
             {activeTab === 'preferences' && renderPreferencesTab()}
             {activeTab === 'referrals' && renderReferralsTab()}
           </div>
         </div>
       </div>
-      
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        [style*="opacity:0"]:hover {
-          opacity: 1 !important;
-        }
-      `}} />
     </div>
   );
 };

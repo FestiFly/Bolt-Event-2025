@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Calendar, ExternalLink, Video, Mic, Plus, Clock, Star, Share, Heart, ThumbsUp, Loader, MessageCircle, TrendingUp, Play, Pause, Volume2, Download, CheckCircle, Globe, Headphones, Navigation, Compass, Route, Car, Plane, Train, Film, Maximize, Minimize, RotateCcw } from 'lucide-react';
+import { jwtDecode }  from 'jwt-decode';
+import Cookies from 'js-cookie';
 
 interface FestivalDetail {
   _id: string;
@@ -45,6 +47,9 @@ const TripPlannerPage = () => {
   const [loadingVideo, setLoadingVideo] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [isVideoFullscreen, setIsVideoFullscreen] = useState(false);
+  const [userPlan, setUserPlan] = useState<string | null>(null);
+  const [voiceUsageLeft, setVoiceUsageLeft] = useState<number | null>(null);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -69,6 +74,25 @@ const TripPlannerPage = () => {
         audioRef.current.src = '';
       }
     };
+  }, []);
+
+  useEffect(() => {
+    // Get and decode JWT token to determine user plan
+    const token = Cookies.get('jwt');
+    if (token) {
+      try {
+        const decoded: any = jwtDecode(token);
+        setUserPlan(decoded.plan || null);
+        
+        // Fetch voice usage statistics from the server
+        fetchVoiceUsageStats();
+      } catch (error) {
+        console.error("Failed to decode JWT:", error);
+        setUserPlan(null);
+      }
+    } else {
+      setUserPlan(null);
+    }
   }, []);
 
   const handleFetchRedditReviews = async () => {
@@ -141,63 +165,33 @@ const TripPlannerPage = () => {
     }
   };
 
-  const getVibeEmoji = (vibeScore: number | null) => {
-    if (vibeScore === null) return '😐';
-    if (vibeScore >= 0.3) return '🎉';
-    if (vibeScore >= 0.15) return '😊';
-    if (vibeScore >= 0) return '😐';
-    return '😕';
-  };
-
-  const getVibeColor = (vibeScore: number | null) => {
-    if (vibeScore === null) return 'border-gray-400 bg-gray-400/20';
-    if (vibeScore >= 0.3) return 'border-green-400 bg-green-400/20';
-    if (vibeScore >= 0.15) return 'border-yellow-400 bg-yellow-400/20';
-    if (vibeScore >= 0) return 'border-blue-400 bg-blue-400/20';
-    return 'border-red-400 bg-red-400/20';
-  };
-
-  const getVibeLabel = (vibeScore: number | null) => {
-    if (vibeScore === null) return 'Unknown Vibe';
-    if (vibeScore >= 0.3) return 'Highly Positive';
-    if (vibeScore >= 0.15) return 'Positive';
-    if (vibeScore >= 0) return 'Neutral';
-    return 'Mixed Reviews';
-  };
-
-  const getReviewScoreColor = (score: number) => {
-    if (score >= 0.7) return 'text-green-400 bg-green-400/20 border-green-400/30';
-    if (score >= 0.4) return 'text-yellow-400 bg-yellow-400/20 border-yellow-400/30';
-    return 'text-red-400 bg-red-400/20 border-red-400/30';
-  };
-
-  const getReviewScoreEmoji = (score: number) => {
-    if (score >= 0.8) return '🔥';
-    if (score >= 0.6) return '👍';
-    if (score >= 0.4) return '👌';
-    return '😐';
-  };
-
-  const getRandomImage = () => {
-    const images = [
-      'https://images.pexels.com/photos/1105666/pexels-photo-1105666.jpeg',
-      'https://images.pexels.com/photos/1190298/pexels-photo-1190298.jpeg',
-      'https://images.pexels.com/photos/2747449/pexels-photo-2747449.jpeg',
-      'https://images.pexels.com/photos/1763075/pexels-photo-1763075.jpeg',
-      'https://images.pexels.com/photos/2263436/pexels-photo-2263436.jpeg',
-      'https://images.pexels.com/photos/1540406/pexels-photo-1540406.jpeg'
-    ];
-    return images[Math.floor(Math.random() * images.length)];
-  };
-
-  const formatDate = (month: string) => {
-    return `${month} 2024`;
-  };
-
-  const truncateContent = (content: string | null, maxLength: number = 150) => {
-    if (!content) return 'Discover this amazing festival experience...';
-    if (content.length <= maxLength) return content;
-    return content.substring(0, maxLength) + '...';
+  const fetchVoiceUsageStats = async () => {
+    const token = Cookies.get('jwt');
+    if (!token) return;
+    
+    try {
+      const response = await fetch('http://localhost:8000/api/subscription/status/', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Set remaining usage based on plan
+        if (data.plan === 'yearly') {
+          setVoiceUsageLeft(null); // Unlimited
+        } else if (data.plan === 'monthly') {
+          setVoiceUsageLeft(5 - (data.voice_usage || 0));
+        } else {
+          // Free user
+          setVoiceUsageLeft(2 - (data.voice_usage || 0));
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching usage stats:", error);
+    }
   };
 
   const handleAddToCalendar = () => {
@@ -298,17 +292,61 @@ const TripPlannerPage = () => {
   const handleVoiceAssistant = async () => {
     if (!festival) return;
 
-    setShowVoiceModal(true);
-    setLoadingVoice(true);
-    setVoiceScript(null);
-    setAudioUrl(null);
-    setIsPlaying(false);
-    setVoiceError(null);
+    // Check if user is logged in
+    const token = Cookies.get('jwt');
+    if (!token) {
+      setVoiceError("Please log in to use the voice assistant feature.");
+      setShowVoiceModal(true);
+      return;
+    }
 
     try {
+      // Decode token to get user info and plan
+      const decoded: any = jwtDecode(token);
+      const plan = decoded.plan;
+      
+      // Free user restrictions
+      if (!plan) {
+        // Check if language is not English
+        if (voiceLang !== 'en') {
+          setVoiceLang('en');
+          setVoiceError("Free users can only generate voice in English. Please upgrade to access more languages.");
+          setShowVoiceModal(true);
+          setShowUpgradePrompt(true);
+          return;
+        }
+        
+        // Check usage limits directly from the latest state
+        if (voiceUsageLeft !== null && voiceUsageLeft <= 0) {
+          setVoiceError("You have reached the voice generation limit for free users. Please upgrade to generate more audio briefings.");
+          setShowVoiceModal(true);
+          setShowUpgradePrompt(true);
+          return;
+        }
+      }
+      
+      // Monthly plan restrictions
+      if (plan === 'monthly' && voiceUsageLeft !== null && voiceUsageLeft <= 0) {
+        setVoiceError("You have reached the voice generation limit for your monthly plan. Please upgrade to our yearly plan for unlimited voice briefings.");
+        setShowVoiceModal(true);
+        setShowUpgradePrompt(true);
+        return;
+      }
+
+      // Proceed with voice generation
+      setShowVoiceModal(true);
+      setLoadingVoice(true);
+      setVoiceScript(null);
+      setAudioUrl(null);
+      setIsPlaying(false);
+      setVoiceError(null);
+
       const response = await fetch("http://localhost:8000/api/generate-voice-briefing/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ _id: festival._id, language: voiceLang }),
       });
 
@@ -325,6 +363,12 @@ const TripPlannerPage = () => {
           const blobUrl = base64ToBlobUrl(data.audio_blob);
           setAudioUrl(blobUrl);
         }
+        
+        // Update the voice usage count in our state
+        if (plan !== 'yearly') {
+          // Refresh usage stats after successful generation
+          setTimeout(() => fetchVoiceUsageStats(), 1000);
+        }
       } else {
         console.error("Voice Assistant Error:", data.error || "Invalid response format");
         setVoiceError(data.error || "Failed to generate voice briefing");
@@ -336,57 +380,6 @@ const TripPlannerPage = () => {
       setLoadingVoice(false);
     }
   };
-
-  const toggleAudioPlayback = () => {
-    if (audioRef.current) {
-      try {
-        if (isPlaying) {
-          audioRef.current.pause();
-        } else {
-          audioRef.current.play().catch(error => {
-            console.error('Audio play failed:', error);
-            setVoiceError('Failed to play audio. Please try again.');
-          });
-        }
-      } catch (error) {
-        console.error('Audio control error:', error);
-        setVoiceError('Audio control error occurred');
-      }
-    }
-  };
-
-  const handleAudioEvents = () => {
-    if (audioRef.current) {
-      const audio = audioRef.current;
-
-      const handlePlay = () => setIsPlaying(true);
-      const handlePause = () => setIsPlaying(false);
-      const handleEnded = () => setIsPlaying(false);
-      const handleError = () => {
-        setIsPlaying(false);
-        setVoiceError('Audio playback error occurred');
-      };
-
-      audio.addEventListener('play', handlePlay);
-      audio.addEventListener('pause', handlePause);
-      audio.addEventListener('ended', handleEnded);
-      audio.addEventListener('error', handleError);
-
-      return () => {
-        audio.removeEventListener('play', handlePlay);
-        audio.removeEventListener('pause', handlePause);
-        audio.removeEventListener('ended', handleEnded);
-        audio.removeEventListener('error', handleError);
-      };
-    }
-  };
-
-  useEffect(() => {
-    if (audioUrl && audioRef.current) {
-      const cleanup = handleAudioEvents();
-      return cleanup;
-    }
-  }, [audioUrl]);
 
   const closeVoiceModal = () => {
     if (audioRef.current) {
@@ -412,6 +405,106 @@ const TripPlannerPage = () => {
   const getGoogleMapsDirectionsUrl = (location: string) => {
     const encodedLocation = encodeURIComponent(location);
     return `https://www.google.com/maps/dir/?api=1&destination=${encodedLocation}`;
+  };
+
+  const handleLanguageSelection = (langCode: string) => {
+    if (langCode === 'en' || userPlan === 'yearly' || userPlan === 'monthly') {
+      setVoiceLang(langCode);
+    } else {
+      setVoiceLang('en'); // Default to English
+      setShowUpgradePrompt(true);
+    }
+  };
+
+  const getLanguageButtonClass = (langCode: string) => {
+    const isSelected = voiceLang === langCode;
+    
+    // English is always available
+    if (langCode === 'en') {
+      return isSelected 
+        ? 'bg-blue-600 border-blue-400 text-white shadow-lg' 
+        : 'bg-blue-600/20 border-blue-400/30 text-blue-200 hover:bg-blue-600/30';
+    }
+    
+    // For other languages, check plan
+    if (userPlan === 'yearly' || userPlan === 'monthly') {
+      return isSelected 
+        ? 'bg-blue-600 border-blue-400 text-white shadow-lg' 
+        : 'bg-blue-600/20 border-blue-400/30 text-blue-200 hover:bg-blue-600/30';
+    }
+    
+    // Free users - locked state
+    return 'bg-gray-600/20 border-gray-400/30 text-gray-400 cursor-not-allowed';
+  };
+
+  const toggleAudioPlayback = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const formatDate = (month: string) => {
+    return month || 'TBA';
+  };
+
+  const getRandomImage = () => {
+    // Array of festival-related image URLs
+    const images = [
+      'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80',
+      'https://images.unsplash.com/photo-1506157786151-b8491531f063?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80',
+      'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80',
+      'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80',
+      'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80'
+    ];
+    return images[Math.floor(Math.random() * images.length)];
+  };
+
+  const getVibeEmoji = (score: number | null) => {
+    if (score === null) return '😐';
+    if (score > 0.7) return '🥳';
+    if (score > 0.5) return '😊';
+    if (score > 0.3) return '🙂';
+    if (score > 0.1) return '😐';
+    return '😔';
+  };
+
+  const getVibeLabel = (score: number | null) => {
+    if (score === null) return 'Unknown';
+    if (score > 0.7) return 'Amazing Vibe';
+    if (score > 0.5) return 'Good Vibe';
+    if (score > 0.3) return 'Neutral Vibe';
+    if (score > 0.1) return 'Mixed Feelings';
+    return 'Concerning';
+  };
+
+  const getVibeColor = (score: number | null) => {
+    if (score === null) return 'border-gray-400/30';
+    if (score > 0.7) return 'border-green-400/30';
+    if (score > 0.5) return 'border-blue-400/30';
+    if (score > 0.3) return 'border-yellow-400/30';
+    if (score > 0.1) return 'border-orange-400/30';
+    return 'border-red-400/30';
+  };
+
+  const getReviewScoreEmoji = (score: number) => {
+    if (score > 0.8) return '🤩';
+    if (score > 0.6) return '😊';
+    if (score > 0.4) return '🙂';
+    if (score > 0.2) return '😐';
+    return '😔';
+  };
+
+  const getReviewScoreColor = (score: number) => {
+    if (score > 0.8) return 'bg-green-600/20 text-green-200 border-green-400/30';
+    if (score > 0.6) return 'bg-blue-600/20 text-blue-200 border-blue-400/30';
+    if (score > 0.4) return 'bg-yellow-600/20 text-yellow-200 border-yellow-400/30';
+    if (score > 0.2) return 'bg-orange-600/20 text-orange-200 border-orange-400/30';
+    return 'bg-red-600/20 text-red-200 border-red-400/30';
   };
 
   if (loading) {
@@ -616,7 +709,7 @@ const TripPlannerPage = () => {
                 {loadingReviews ? (
                   <>
                     <Loader className="h-5 w-5 animate-spin" />
-                    <span>Fetching Reddit Reviews...</span>
+                   
                   </>
                 ) : (
                   <>
@@ -1025,17 +1118,23 @@ const TripPlannerPage = () => {
                     {languageOptions.map((lang) => (
                       <button
                         key={lang.code}
-                        onClick={() => setVoiceLang(lang.code)}
-                        disabled={loadingVoice}
-                        className={`p-3 rounded-lg border transition-all transform hover:scale-105 ${voiceLang === lang.code
-                          ? 'bg-blue-600 border-blue-400 text-white shadow-lg'
-                          : 'bg-blue-600/20 border-blue-400/30 text-blue-200 hover:bg-blue-600/30'
-                          } ${loadingVoice ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        onClick={() => handleLanguageSelection(lang.code)}
+                        disabled={loadingVoice || (lang.code !== 'en' && !userPlan)}
+                        className={`p-3 rounded-lg border transition-all transform ${
+                          lang.code === 'en' || userPlan ? 'hover:scale-105' : ''
+                        } ${getLanguageButtonClass(lang.code)} ${
+                          loadingVoice ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
                       >
                         <div className="flex items-center space-x-2">
                           <span className="text-lg">{lang.flag}</span>
                           <div className="text-left">
-                            <div className="font-medium text-sm">{lang.name}</div>
+                            <div className="font-medium text-sm">
+                              {lang.name}
+                              {lang.code !== 'en' && !userPlan && (
+                                <span className="ml-1 text-xs">🔒</span>
+                              )}
+                            </div>
                             <div className="text-xs opacity-75">{lang.accent}</div>
                           </div>
                         </div>
@@ -1047,6 +1146,18 @@ const TripPlannerPage = () => {
                     <p className="text-blue-300 text-xs">
                       Selected: {getSelectedLanguage().flag} {getSelectedLanguage().name} ({getSelectedLanguage().accent})
                     </p>
+                    
+                    {voiceUsageLeft !== null && (
+                      <p className="text-amber-300 text-xs mt-1">
+                        {voiceUsageLeft} voice generation{voiceUsageLeft !== 1 ? 's' : ''} remaining
+                      </p>
+                    )}
+                    
+                    {userPlan === 'yearly' && (
+                      <p className="text-green-300 text-xs mt-1">
+                        Unlimited voice generations available (Premium Plan)
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -1174,6 +1285,33 @@ const TripPlannerPage = () => {
                     <span>Close</span>
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showUpgradePrompt && (
+          <div className="bg-purple-600/20 rounded-lg p-6 mb-6 border border-purple-400/30">
+            <div className="text-center">
+              <h4 className="text-purple-200 text-lg font-semibold mb-2">Upgrade Your Experience!</h4>
+              <p className="text-purple-300 text-sm mb-4">
+                {!userPlan 
+                  ? "Get access to all languages and more voice generations with our premium plans"
+                  : "Upgrade to yearly plan for unlimited voice generations"}
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <a
+                  href="/pricing"
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg text-white font-medium hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105"
+                >
+                  View Premium Plans
+                </a>
+                <button
+                  onClick={() => setShowUpgradePrompt(false)}
+                  className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors"
+                >
+                  Maybe Later
+                </button>
               </div>
             </div>
           </div>
