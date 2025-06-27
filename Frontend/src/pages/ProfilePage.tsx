@@ -1,19 +1,65 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Edit2, Save, X, Camera, Loader, MapPin, Heart, Users, Link as LinkIcon, Copy, Check, AlertCircle, Crown } from 'lucide-react';
-import axios from 'axios';
-import Cookies from 'js-cookie';
-import { checkPremiumStatus, formatExpiryDate } from '/utils/premium';
+import { useNavigate } from 'react-router-dom';
+import { Mail, Edit2, Save, X, Camera, Loader, MapPin, Heart, Users, Copy, Check, AlertCircle, Crown, User, Settings } from "lucide-react";
+import axios from "axios";
+import Cookies from "js-cookie";
 
-// Auth utility function
-const getCurrentUser = (): any => {
-  const userJson = localStorage.getItem('festifly_user');
-  return userJson ? JSON.parse(userJson) : null;
+// Internal utility functions
+const getAuthToken = (): string | null => {
+  return Cookies.get('jwt') || null;
+};
+
+const checkPremiumStatus = (user: any) => {
+  // Return a default structure if user is null or undefined
+  if (!user) {
+    return {
+      isActive: false,
+      isPlus: false,
+      plan: null,
+      expiresAt: null
+    };
+  }
+
+  // Make sure premium exists before accessing its properties
+  const premium = user.premium || {};
+  
+  if (!premium.is_active) {
+    return {
+      isActive: false,
+      isPlus: false,
+      plan: null,
+      expiresAt: null
+    };
+  }
+
+  return {
+    isActive: premium.is_active || false,
+    isPlus: premium.plan === 'yearly',
+    plan: premium.plan || null,
+    expiresAt: premium.expires_at || null
+  };
+};
+
+const formatExpiryDate = (expiryDate: string | null): string => {
+  if (!expiryDate) return 'Never';
+  
+  try {
+    const date = new Date(expiryDate);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch (error) {
+    return 'Invalid Date';
+  }
 };
 
 const ProfilePage = () => {
+  const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'preferences', 'referrals'
+  const [activeTab, setActiveTab] = useState('profile');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -25,44 +71,42 @@ const ProfilePage = () => {
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [referralCode, setReferralCode] = useState('');
   const [copySuccess, setCopySuccess] = useState(false);
-  const [referralInputCode, setReferralInputCode] = useState('');
-  const [referralSubmitLoading, setReferralSubmitLoading] = useState(false);
-  const [referralError, setReferralError] = useState('');
-  const [referralSuccess, setReferralSuccess] = useState('');
+  const [userLoading, setUserLoading] = useState(true);
   
   const interestOptions = [
     'Music', 'Food', 'Art', 'Technology', 'Culture', 'Comedy',
     'Film', 'Literature', 'Sports', 'Gaming', 'Wellness', 'Dance'
   ];
 
-  const premiumStatus = checkPremiumStatus();
+  const premiumStatus = checkPremiumStatus(user);
 
   useEffect(() => {
-    const currentUser = getCurrentUser();
-    setUser(currentUser);
-    
-    if (currentUser) {
-      setFormData({
-        name: currentUser.name || '',
-        email: currentUser.email || '',
-        bio: currentUser.bio || '',
-        location: currentUser.location || '',
-        preferences: currentUser.preferences || []
-      });
-      setReferralCode(currentUser.referralCode || 'FESTIFLY' + Math.random().toString(36).substring(2, 8).toUpperCase());
-      
-      // Calculate profile completion
-      calculateProfileCompletion(currentUser);
+    // Check if user is authenticated
+    const token = getAuthToken();
+    if (!token) {
+      navigate('/auth');
+      return;
     }
     
-    // Fetch updated user data from backend
+    // Fetch user data from API on component mount
     fetchUserProfile();
-  }, []);
+    
+    // Then check subscription status (after a small delay to ensure user is loaded)
+    setTimeout(() => {
+      if (user) { // Only check if user exists
+        checkSubscriptionStatus();
+      }
+    }, 500);
+  }, [navigate]);
 
   const fetchUserProfile = async () => {
     try {
-      const token = Cookies.get('jwt');
-      if (!token) return;
+      const token = getAuthToken();
+      if (!token) {
+        console.error('No auth token found');
+        navigate('/auth');
+        return;
+      }
       
       const response = await axios.get('http://localhost:8000/api/user/profile/', {
         headers: { Authorization: `Bearer ${token}` }
@@ -71,7 +115,6 @@ const ProfilePage = () => {
       if (response.data) {
         const userData = response.data;
         setUser(userData);
-        localStorage.setItem('festifly_user', JSON.stringify(userData));
         
         setFormData({
           name: userData.name || '',
@@ -84,8 +127,15 @@ const ProfilePage = () => {
         setReferralCode(userData.referralCode || '');
         calculateProfileCompletion(userData);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching profile:', error);
+      if (error.response?.status === 401) {
+        // Token expired or invalid, redirect to login
+        Cookies.remove('jwt');
+        navigate('/auth');
+      }
+    } finally {
+      setUserLoading(false);
     }
   };
 
@@ -131,26 +181,22 @@ const ProfilePage = () => {
     setLoading(true);
     
     try {
-      const token = Cookies.get('jwt');
+      const token = getAuthToken();
       
-      const updatedUser = {
-        ...user,
+      const response = await axios.post('http://localhost:8000/api/user/update-profile/', {
         name: formData.name,
         bio: formData.bio,
         location: formData.location,
         preferences: formData.preferences
-      };
-      
-      // Call API to update user profile
-      await axios.post('http://localhost:8000/api/user/update-profile/', updatedUser, {
+      }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      // Update local storage
-      localStorage.setItem('festifly_user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      setIsEditing(false);
-      calculateProfileCompletion(updatedUser);
+      if (response.data && response.data.user) {
+        setUser(response.data.user);
+        setIsEditing(false);
+        calculateProfileCompletion(response.data.user);
+      }
     } catch (error) {
       console.error('Error updating profile:', error);
     } finally {
@@ -164,37 +210,81 @@ const ProfilePage = () => {
     setTimeout(() => setCopySuccess(false), 2000);
   };
 
-  const submitReferralCode = async () => {
-    if (!referralInputCode) return;
-    
-    setReferralError('');
-    setReferralSuccess('');
-    setReferralSubmitLoading(true);
-    
-    try {
-      const token = Cookies.get('jwt');
-      
-      const response = await axios.post(
-        'http://localhost:8000/api/user/apply-referral/',
-        { referralCode: referralInputCode },
-        { headers: { Authorization: `Bearer ${token}` }}
-      );
-      
-      if (response.data.success) {
-        setReferralSuccess('Referral code applied successfully!');
-        setReferralInputCode('');
-        
-        // Refresh user data
-        fetchUserProfile();
-      } else {
-        setReferralError(response.data.error || 'Invalid referral code');
+  // Update the checkSubscriptionStatus function with proper null checks
+  const checkSubscriptionStatus = () => {
+    const token = getAuthToken();
+    if (!token) return;
+
+    setLoading(true);
+    fetch('http://localhost:8000/api/subscription/status/', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
       }
-    } catch (error: any) {
-      setReferralError(error.response?.data?.error || 'Error applying referral code');
-    } finally {
-      setReferralSubmitLoading(false);
-    }
+    })
+    .then(res => res.json())
+    .then(data => {
+      console.log('Subscription status:', data);
+      
+      // If subscription has expired, update the local user object
+      if (data.is_expired && !data.is_active) {
+        setUser((prev: { premium: any; }) => {
+          // Make sure prev exists before updating
+          if (!prev) return prev;
+          
+          return {
+            ...prev,
+            premium: {
+              ...(prev.premium || {}), // Use empty object as fallback if premium is null
+              is_active: false,
+              expired: true
+            }
+          };
+        });
+        
+        // If needed, show renewal notification
+        if (data.need_renewal) {
+          // Add your notification code here
+        }
+      }
+    })
+    .catch(err => {
+      console.error('Error checking subscription status:', err);
+    })
+    .finally(() => {
+      setLoading(false);
+    });
   };
+
+  // Add another useEffect to check subscription when user changes
+  useEffect(() => {
+    // Only check if user exists
+    if (user) {
+      checkSubscriptionStatus();
+    }
+  }, [user]); // This will run when the user object is updated
+
+  if (userLoading) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }}>
+        <div style={{ 
+          display: "flex", 
+          flexDirection: "column", 
+          alignItems: "center", 
+          gap: "1rem",
+          color: "white" 
+        }}>
+          <Loader size={32} style={{ animation: "spin 1s linear infinite" }} />
+          <p>Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -204,7 +294,28 @@ const ProfilePage = () => {
         alignItems: "center",
         justifyContent: "center"
       }}>
-        <div style={{ color: "white" }}>Loading profile...</div>
+        <div style={{ 
+          color: "white",
+          textAlign: "center"
+        }}>
+          <AlertCircle size={48} color="rgb(248, 113, 113)" style={{ margin: "0 auto 1rem" }} />
+          <h2>Unable to load profile</h2>
+          <p>Please try refreshing the page or logging in again.</p>
+          <button 
+            onClick={() => navigate('/auth')}
+            style={{
+              marginTop: "1rem",
+              padding: "0.75rem 1.5rem",
+              backgroundColor: "rgb(124, 58, 237)",
+              color: "white",
+              border: "none",
+              borderRadius: "0.5rem",
+              cursor: "pointer"
+            }}
+          >
+            Go to Login
+          </button>
+        </div>
       </div>
     );
   }
@@ -301,6 +412,7 @@ const ProfilePage = () => {
               <p style={{ color: "white" }}>{user.created_at ? new Date(user.created_at).toLocaleDateString() : "N/A"}</p>
             </div>
           </div>
+           
         </div>
       </div>
 
@@ -312,11 +424,16 @@ const ProfilePage = () => {
     <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       <div>
         <label style={{
-          display: "block",
+          display: "flex",
           color: "white",
           fontWeight: "500",
-          marginBottom: "0.5rem"
-        }}>Full Name</label>
+          marginBottom: "0.5rem",
+          alignItems: "center",
+          gap: "0.5rem"
+        }}>
+          <User size={16} />
+          Name
+        </label>
         <input
           type="text"
           name="name"
@@ -337,15 +454,21 @@ const ProfilePage = () => {
       
       <div>
         <label style={{
-          display: "block",
+          display: "flex",
           color: "white",
           fontWeight: "500",
-          marginBottom: "0.5rem"
-        }}>Email</label>
+          marginBottom: "0.5rem",
+          alignItems: "center",
+          gap: "0.5rem"
+        }}>
+          <Mail size={16} />
+          Email
+        </label>
         <input
           type="email"
           name="email"
           value={formData.email}
+          onChange={handleInputChange}
           disabled
           style={{
             width: "100%",
@@ -354,48 +477,19 @@ const ProfilePage = () => {
             border: "1px solid rgba(255, 255, 255, 0.1)",
             borderRadius: "0.5rem",
             color: "rgb(156, 163, 175)",
+            outline: "none",
             cursor: "not-allowed"
           }}
+          placeholder="Your email"
         />
-        <p style={{
-          fontSize: "0.75rem",
-          color: "rgb(156, 163, 175)",
-          marginTop: "0.25rem"
-        }}>Email cannot be changed</p>
       </div>
       
       <div>
         <label style={{
-          display: "block",
-          color: "white",
-          fontWeight: "500",
-          marginBottom: "0.5rem"
-        }}>Bio</label>
-        <textarea
-          name="bio"
-          value={formData.bio}
-          onChange={handleInputChange}
-          rows={4}
-          style={{
-            width: "100%",
-            padding: "0.75rem 1rem",
-            backgroundColor: "rgba(255, 255, 255, 0.1)",
-            border: "1px solid rgba(255, 255, 255, 0.2)",
-            borderRadius: "0.5rem",
-            color: "white",
-            outline: "none"
-          }}
-          placeholder="Tell us about yourself"
-        ></textarea>
-      </div>
-      
-      <div>
-        <label style={{
-          display: "block",
+          display: "flex",
           color: "white",
           fontWeight: "500",
           marginBottom: "0.5rem",
-          display: "flex",
           alignItems: "center",
           gap: "0.5rem"
         }}>
@@ -416,51 +510,72 @@ const ProfilePage = () => {
             color: "white",
             outline: "none"
           }}
-          placeholder="City, State"
+          placeholder="Your location"
         />
       </div>
       
       <div>
         <label style={{
-          display: "block",
+          display: "flex",
           color: "white",
           fontWeight: "500",
           marginBottom: "0.5rem",
+          alignItems: "center",
+          gap: "0.5rem"
+        }}>
+          <Heart size={16} />
+          Bio
+        </label>
+        <textarea
+          name="bio"
+          value={formData.bio}
+          onChange={handleInputChange}
+          rows={4}
+          style={{
+            width: "100%",
+            padding: "0.75rem 1rem",
+            backgroundColor: "rgba(255, 255, 255, 0.1)",
+            border: "1px solid rgba(255, 255, 255, 0.2)",
+            borderRadius: "0.5rem",
+            color: "white",
+            outline: "none",
+            resize: "vertical"
+          }}
+          placeholder="Tell us about yourself..."
+        />
+      </div>
+      
+      <div>
+        <label style={{
           display: "flex",
+          color: "white",
+          fontWeight: "500",
+          marginBottom: "0.5rem",
           alignItems: "center",
           gap: "0.5rem"
         }}>
           <Heart size={16} />
           Interests
         </label>
-        <div style={{ 
-          display: "grid", 
-          gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", 
-          gap: "0.75rem",
-          marginBottom: "1rem" 
-        }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "0.5rem" }}>
           {interestOptions.map((interest) => (
             <button
-              type="button"
               key={interest}
+              type="button"
               onClick={() => handlePreferenceToggle(interest)}
               style={{
-                padding: "0.5rem",
+                padding: "0.5rem 0.75rem",
                 borderRadius: "0.5rem",
-                transition: "all 0.2s",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                backgroundColor: formData.preferences.includes(interest) 
+                  ? "rgba(124, 58, 237, 0.3)" 
+                  : "rgba(255, 255, 255, 0.1)",
+                color: formData.preferences.includes(interest) 
+                  ? "rgb(216, 180, 254)" 
+                  : "white",
                 cursor: "pointer",
-                ...(formData.preferences.includes(interest) 
-                  ? {
-                      backgroundColor: "rgba(124, 58, 237, 0.5)",
-                      color: "white",
-                      border: "1px solid rgba(139, 92, 246, 0.5)",
-                      transform: "scale(1.05)"
-                    } 
-                  : {
-                      backgroundColor: "rgba(255, 255, 255, 0.1)",
-                      color: "rgb(209, 213, 219)",
-                      border: "1px solid rgba(255, 255, 255, 0.2)"
-                    })
+                transition: "all 0.2s",
+                fontSize: "0.875rem"
               }}
             >
               {interest}
@@ -469,120 +584,65 @@ const ProfilePage = () => {
         </div>
       </div>
       
-      <button
-        type="submit"
-        disabled={loading}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "0.5rem",
-          padding: "0.75rem 1.5rem",
-          background: "linear-gradient(to right, rgb(124, 58, 237), rgb(37, 99, 235))",
-          color: "white",
-          borderRadius: "0.5rem",
-          fontWeight: "600",
-          boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)",
-          border: "none",
-          cursor: loading ? "not-allowed" : "pointer",
-          opacity: loading ? 0.7 : 1
-        }}
-      >
-        {loading ? (
-          <Loader size={20} style={{ animation: "spin 1s linear infinite" }} />
-        ) : (
-          <>
-            <Save size={20} />
-            <span>Save Changes</span>
-          </>
-        )}
-      </button>
+      <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
+        <button
+          type="button"
+          onClick={() => setIsEditing(false)}
+          style={{
+            padding: "0.75rem 1.5rem",
+            borderRadius: "0.5rem",
+            border: "1px solid rgba(255, 255, 255, 0.2)",
+            backgroundColor: "transparent",
+            color: "white",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem"
+          }}
+        >
+          <X size={16} />
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            padding: "0.75rem 1.5rem",
+            borderRadius: "0.5rem",
+            border: "none",
+            background: "linear-gradient(to right, rgb(124, 58, 237), rgb(37, 99, 235))",
+            color: "white",
+            cursor: loading ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            opacity: loading ? 0.7 : 1
+          }}
+        >
+          {loading ? <Loader size={16} style={{ animation: "spin 1s linear infinite" }} /> : <Save size={16} />}
+          {loading ? "Saving..." : "Save Changes"}
+        </button>
+      </div>
     </form>
   );
   
   const renderPreferencesTab = () => (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-      <div>
-        <h3 style={{
-          fontSize: "1.125rem",
-          fontWeight: "500",
-          color: "white",
-          marginBottom: "1rem"
-        }}>Complete Your Profile</h3>
-        
-        <div style={{ marginBottom: "1.5rem" }}>
-          <div style={{ 
-            display: "flex", 
-            justifyContent: "space-between", 
-            alignItems: "center",
-            marginBottom: "0.5rem" 
-          }}>
-            <span style={{ color: "white", fontSize: "0.875rem" }}>
-              Profile Completion
-            </span>
-            <span style={{ 
-              color: profileCompletion >= 70 ? "rgb(134, 239, 172)" : "rgb(252, 165, 165)",
-              fontSize: "0.875rem",
-              fontWeight: "500"
-            }}>
-              {profileCompletion}%
-            </span>
-          </div>
-          
-          <div style={{
-            height: "0.5rem",
-            backgroundColor: "rgba(255, 255, 255, 0.1)",
-            borderRadius: "9999px",
-            overflow: "hidden"
-          }}>
-            <div 
-              style={{
-                height: "100%",
-                width: `${profileCompletion}%`,
-                backgroundColor: profileCompletion >= 70 ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)",
-                borderRadius: "9999px",
-                transition: "width 1s ease-in-out"
-              }}
-            ></div>
-          </div>
-        </div>
-        
-        <button
-          onClick={() => setIsEditing(true)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "0.5rem",
-            width: "100%",
-            padding: "0.75rem",
-            backgroundColor: profileCompletion < 100 ? "rgba(124, 58, 237, 0.3)" : "rgba(34, 197, 94, 0.3)",
-            color: profileCompletion < 100 ? "rgb(216, 180, 254)" : "rgb(134, 239, 172)",
-            border: `1px solid ${profileCompletion < 100 ? "rgba(139, 92, 246, 0.3)" : "rgba(34, 197, 94, 0.3)"}`,
-            borderRadius: "0.5rem",
-            cursor: "pointer",
-            marginBottom: "2rem"
-          }}
-        >
-          <Edit2 size={16} />
-          <span>{profileCompletion < 100 ? "Complete Your Profile" : "Update Your Profile"}</span>
-        </button>
-        
-        <div>
-          <h4 style={{
-            fontSize: "1rem",
-            fontWeight: "500",
-            color: "white",
-            marginBottom: "0.75rem"
-          }}>Why Complete Your Profile?</h4>
-          
-          <ul style={{ color: "rgb(209, 213, 219)", paddingLeft: "1.5rem" }}>
-            <li style={{ marginBottom: "0.5rem" }}>Get better festival recommendations</li>
-            <li style={{ marginBottom: "0.5rem" }}>Connect with like-minded festival goers</li>
-            <li style={{ marginBottom: "0.5rem" }}>Receive personalized notifications about events</li>
-            <li>Earn referral rewards faster</li>
-          </ul>
-        </div>
+      <h3 style={{ color: "white", marginBottom: "1rem" }}>Notification Preferences</h3>
+      <div style={{
+        backgroundColor: "rgba(255, 255, 255, 0.05)",
+        borderRadius: "0.5rem",
+        padding: "2rem",
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+        textAlign: "center"
+      }}>
+        <Settings size={48} color="rgb(156, 163, 175)" style={{ margin: "0 auto 1rem" }} />
+        <p style={{ color: "rgb(209, 213, 219)", fontSize: "1.125rem", marginBottom: "0.5rem" }}>
+          Notification Settings
+        </p>
+        <p style={{ color: "rgb(156, 163, 175)", fontSize: "0.875rem" }}>
+          Customize your notification preferences here. This feature is coming soon!
+        </p>
       </div>
     </div>
   );
@@ -590,250 +650,137 @@ const ProfilePage = () => {
   const renderReferralsTab = () => (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       <div>
-        <h3 style={{
-          fontSize: "1.125rem",
-          fontWeight: "500",
-          color: "white",
-          marginBottom: "1rem"
-        }}>Your Referral Code</h3>
-        
-        <div style={{
-          backgroundColor: "rgba(255, 255, 255, 0.05)",
-          borderRadius: "0.5rem",
-          padding: "1rem",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          marginBottom: "1.5rem"
+        <h3 style={{ 
+          color: "white", 
+          marginBottom: "0.5rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem"
         }}>
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center"
+          <Users size={20} />
+          Your Referral Code
+        </h3>
+        <p style={{ color: "rgb(156, 163, 175)", fontSize: "0.875rem", marginBottom: "1rem" }}>
+          Share this code with friends to earn rewards when they join FestiFly!
+        </p>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          padding: "1rem",
+          backgroundColor: "rgba(255, 255, 255, 0.1)",
+          borderRadius: "0.5rem",
+          border: "1px solid rgba(255, 255, 255, 0.2)"
+        }}>
+          <code style={{ 
+            color: "rgb(216, 180, 254)", 
+            fontFamily: "monospace", 
+            flex: 1,
+            fontSize: "1.125rem",
+            fontWeight: "500"
           }}>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              color: "white"
-            }}>
-              <LinkIcon size={16} />
-              <span style={{ fontWeight: "600", letterSpacing: "0.05em" }}>{referralCode}</span>
-            </div>
-            
-            <button
-              onClick={copyReferralCode}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                padding: "0.5rem 0.75rem",
-                backgroundColor: "rgba(255, 255, 255, 0.1)",
-                color: "white",
-                border: "none",
-                borderRadius: "0.5rem",
-                cursor: "pointer"
-              }}
-            >
-              {copySuccess ? <Check size={16} /> : <Copy size={16} />}
-              <span>{copySuccess ? "Copied!" : "Copy"}</span>
-            </button>
-          </div>
-          
-          <p style={{ 
-            color: "rgb(209, 213, 219)", 
-            fontSize: "0.875rem", 
-            marginTop: "0.75rem" 
-          }}>
-            Share this code with friends and earn rewards when they sign up!
-          </p>
+            {referralCode}
+          </code>
+          <button
+            onClick={copyReferralCode}
+            style={{
+              padding: "0.5rem",
+              backgroundColor: copySuccess ? "rgba(34, 197, 94, 0.2)" : "rgba(124, 58, 237, 0.2)",
+              border: `1px solid ${copySuccess ? "rgba(34, 197, 94, 0.3)" : "rgba(124, 58, 237, 0.3)"}`,
+              borderRadius: "0.375rem",
+              color: copySuccess ? "rgb(74, 222, 128)" : "rgb(216, 180, 254)",
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+          >
+            {copySuccess ? <Check size={16} /> : <Copy size={16} />}
+          </button>
         </div>
-        
+        {copySuccess && (
+          <p style={{ 
+            color: "rgb(74, 222, 128)", 
+            fontSize: "0.875rem", 
+            marginTop: "0.5rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.25rem"
+          }}>
+            <Check size={14} />
+            Referral code copied to clipboard!
+          </p>
+        )}
+      </div>
+      
+      {user.referrals && user.referrals.length > 0 && (
         <div>
-          <h4 style={{
-            fontSize: "1rem",
-            fontWeight: "500",
-            color: "white",
-            marginBottom: "0.75rem",
+          <h3 style={{ 
+            color: "white", 
+            marginBottom: "1rem",
             display: "flex",
             alignItems: "center",
             gap: "0.5rem"
           }}>
-            <Users size={16} />
-            Your Referrals
-          </h4>
-          
-          {user.referrals && user.referrals.length > 0 ? (
-            <div style={{
-              backgroundColor: "rgba(255, 255, 255, 0.05)",
-              borderRadius: "0.5rem",
-              overflow: "hidden",
-              border: "1px solid rgba(255, 255, 255, 0.1)"
-            }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{
-                    borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
-                    backgroundColor: "rgba(255, 255, 255, 0.02)"
-                  }}>
-                    <th style={{ padding: "0.75rem 1rem", textAlign: "left", color: "rgb(156, 163, 175)", fontWeight: "500" }}>User</th>
-                    <th style={{ padding: "0.75rem 1rem", textAlign: "left", color: "rgb(156, 163, 175)", fontWeight: "500" }}>Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {user.referrals.map((referral: any, index: number) => (
-                    <tr key={index} style={{
-                      borderBottom: index < user.referrals.length - 1 ? "1px solid rgba(255, 255, 255, 0.05)" : "none"
-                    }}>
-                      <td style={{ padding: "0.75rem 1rem", color: "white" }}>{referral.username}</td>
-                      <td style={{ padding: "0.75rem 1rem", color: "rgb(209, 213, 219)" }}>
-                        {new Date(referral.date).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p style={{ color: "rgb(209, 213, 219)" }}>
-              You haven't referred anyone yet. Share your code to get started!
-            </p>
-          )}
-        </div>
-        
-        {!user.referredBy && (
-          <div style={{ marginTop: "1rem" }}>
-            <h4 style={{
-              fontSize: "1rem",
-              fontWeight: "500",
-              color: "white",
-              marginBottom: "0.75rem"
-            }}>
-              Enter a Referral Code
-            </h4>
-            
-            {referralError && (
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                padding: "0.75rem 1rem",
-                backgroundColor: "rgba(239, 68, 68, 0.2)",
-                color: "rgb(252, 165, 165)",
-                borderRadius: "0.5rem",
-                marginBottom: "1rem",
-                border: "1px solid rgba(239, 68, 68, 0.3)"
-              }}>
-                <AlertCircle size={16} />
-                <span>{referralError}</span>
-              </div>
-            )}
-            
-            {referralSuccess && (
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                padding: "0.75rem 1rem",
-                backgroundColor: "rgba(34, 197, 94, 0.2)",
-                color: "rgb(134, 239, 172)",
-                borderRadius: "0.5rem",
-                marginBottom: "1rem",
-                border: "1px solid rgba(34, 197, 94, 0.3)"
-              }}>
-                <Check size={16} />
-                <span>{referralSuccess}</span>
-              </div>
-            )}
-            
-            <div style={{
-              display: "flex",
-              gap: "0.5rem"
-            }}>
-              <input
-                type="text"
-                value={referralInputCode}
-                onChange={(e) => setReferralInputCode(e.target.value.toUpperCase())}
-                placeholder="Enter referral code"
+            <Users size={20} />
+            Successful Referrals ({user.referrals.length})
+          </h3>
+          <div style={{ 
+            display: "grid", 
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", 
+            gap: "1rem" 
+          }}>
+            {user.referrals.map((referral: any, index: number) => (
+              <div
+                key={index}
                 style={{
-                  flex: "1 1 0%",
-                  padding: "0.75rem 1rem",
-                  backgroundColor: "rgba(255, 255, 255, 0.1)",
-                  border: "1px solid rgba(255, 255, 255, 0.2)",
-                  borderRadius: "0.5rem",
-                  color: "white",
-                  outline: "none"
-                }}
-              />
-              <button
-                onClick={submitReferralCode}
-                disabled={!referralInputCode || referralSubmitLoading}
-                style={{
-                  padding: "0.75rem 1.5rem",
-                  backgroundColor: "rgba(124, 58, 237, 0.3)",
-                  color: "rgb(216, 180, 254)",
-                  border: "1px solid rgba(139, 92, 246, 0.3)",
-                  borderRadius: "0.5rem",
-                  cursor: !referralInputCode || referralSubmitLoading ? "not-allowed" : "pointer",
-                  opacity: !referralInputCode || referralSubmitLoading ? 0.5 : 1,
+                  backgroundColor: "rgba(34, 197, 94, 0.1)",
+                  border: "1px solid rgba(34, 197, 94, 0.3)",
+                  borderRadius: "0.75rem",
+                  padding: "1rem",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center"
+                  gap: "0.75rem"
                 }}
               >
-                {referralSubmitLoading ? (
-                  <Loader size={16} style={{ animation: "spin 1s linear infinite" }} />
-                ) : 'Apply'}
-              </button>
-            </div>
-          </div>
-        )}
-        
-        {user.referredBy && (
-          <div style={{ marginTop: "1rem" }}>
-            <h4 style={{
-              fontSize: "1rem",
-              fontWeight: "500",
-              color: "white",
-              marginBottom: "0.75rem"
-            }}>
-              Referred By
-            </h4>
-            
-            <div style={{
-              backgroundColor: "rgba(255, 255, 255, 0.05)",
-              borderRadius: "0.5rem",
-              padding: "1rem",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.75rem"
-            }}>
-              <div style={{
-                width: "2.5rem",
-                height: "2.5rem",
-                borderRadius: "9999px",
-                background: "linear-gradient(to bottom right, rgb(168, 85, 247), rgb(59, 130, 246))",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "1rem",
-                fontWeight: "bold",
-                color: "white"
-              }}>
-                {user.referredBy.username ? user.referredBy.username.charAt(0).toUpperCase() : "U"}
+                <div style={{
+                  width: "2.5rem",
+                  height: "2.5rem",
+                  borderRadius: "9999px",
+                  backgroundColor: "rgba(34, 197, 94, 0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "1rem",
+                  color: "rgb(74, 222, 128)",
+                  fontWeight: "600"
+                }}>
+                  {referral.username ? referral.username.charAt(0).toUpperCase() : "U"}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ 
+                    color: "rgb(74, 222, 128)", 
+                    fontSize: "1rem", 
+                    fontWeight: "500",
+                    margin: "0 0 0.25rem 0" 
+                  }}>
+                    {referral.username || "Unknown User"}
+                  </p>
+                  <p style={{ 
+                    color: "rgb(156, 163, 175)", 
+                    fontSize: "0.875rem",
+                    margin: 0 
+                  }}>
+                    Joined on {referral.date ? new Date(referral.date).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    }) : "Unknown date"}
+                  </p>
+                </div>
               </div>
-              
-              <div>
-                <p style={{ color: "white", fontWeight: "500" }}>
-                  {user.referredBy.username}
-                </p>
-                <p style={{ color: "rgb(156, 163, 175)", fontSize: "0.875rem" }}>
-                  {new Date(user.referredBy.date).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 
@@ -841,40 +788,39 @@ const ProfilePage = () => {
     if (!premiumStatus.isActive) {
       return (
         <div style={{
-          marginTop: "1.5rem",
-          padding: "1rem",
-          backgroundColor: "rgba(255, 255, 255, 0.05)",
+          backgroundColor: "rgba(124, 58, 237, 0.1)",
+          border: "1px solid rgba(124, 58, 237, 0.3)",
           borderRadius: "0.5rem",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
+          padding: "1rem",
+          textAlign: "center"
         }}>
-          <h3 style={{
-            color: "white",
-            fontSize: "1rem",
-            fontWeight: "500",
-            marginBottom: "0.5rem"
-          }}>
-            Premium Status
-          </h3>
-          <p style={{ color: "rgb(209, 213, 219)" }}>
-            You are currently on the <span style={{ color: "white" }}>Free Plan</span>
+          <Crown size={24} color="rgb(216, 180, 254)" style={{ margin: "0 auto 0.5rem" }} />
+          <h4 style={{ color: "rgb(216, 180, 254)", marginBottom: "0.5rem" }}>Upgrade to Premium</h4>
+          <p style={{ color: "rgb(209, 213, 219)", fontSize: "0.875rem", marginBottom: "1rem" }}>
+            Get access to exclusive features and priority support
           </p>
           <button
-            onClick={() => navigate('/')} 
+            onClick={() => {
+              // Navigate to onboarding page and open premium modal
+              navigate('/?openPremium=true');
+            }}
             style={{
-              marginTop: "0.5rem",
+              backgroundColor: "rgb(124, 58, 237)",
+              color: "white",
+              border: "none",
+              borderRadius: "0.375rem",
+              padding: "0.5rem 1rem",
+              fontSize: "0.875rem",
+              fontWeight: "500",
               display: "inline-flex",
               alignItems: "center",
               gap: "0.5rem",
-              padding: "0.5rem 1rem",
-              backgroundColor: "rgba(124, 58, 237, 0.3)",
-              color: "rgb(216, 180, 254)",
-              borderRadius: "0.375rem",
-              border: "1px solid rgba(139, 92, 246, 0.3)",
-              cursor: "pointer"
+              cursor: "pointer",
+              transition: "all 0.2s",
             }}
           >
             <Crown size={16} />
-            <span>Upgrade to Premium</span>
+            View Premium Plans
           </button>
         </div>
       );
@@ -882,53 +828,18 @@ const ProfilePage = () => {
     
     return (
       <div style={{
-        marginTop: "1.5rem",
-        padding: "1rem",
-        backgroundColor: premiumStatus.isPlus ? 
-          "rgba(234, 179, 8, 0.1)" : 
-          "rgba(124, 58, 237, 0.1)",
+        backgroundColor: "rgba(34, 197, 94, 0.1)",
+        border: "1px solid rgba(34, 197, 94, 0.3)",
         borderRadius: "0.5rem",
-        border: `1px solid ${premiumStatus.isPlus ? 
-          "rgba(234, 179, 8, 0.3)" : 
-          "rgba(124, 58, 237, 0.3)"}`
+        padding: "1rem"
       }}>
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          marginBottom: "0.5rem"
-        }}>
-          <Crown 
-            size={20} 
-            style={{ 
-              color: premiumStatus.isPlus ? "rgb(250, 204, 21)" : "rgb(167, 139, 250)" 
-            }} 
-          />
-          <h3 style={{
-            color: "white",
-            fontSize: "1rem",
-            fontWeight: "500"
-          }}>
-            {premiumStatus.isPlus ? "Premium Plus" : "Premium"} Plan
-          </h3>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+          <Crown size={20} color="rgb(74, 222, 128)" />
+          <h4 style={{ color: "rgb(74, 222, 128)" }}>Premium Member</h4>
         </div>
-        
-        <div style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.5rem"
-        }}>
-          <p style={{ color: "rgb(209, 213, 219)" }}>
-            Plan: <span style={{ color: "white" }}>
-              {premiumStatus.plan === "yearly" ? "Yearly" : "Monthly"}
-            </span>
-          </p>
-          <p style={{ color: "rgb(209, 213, 219)" }}>
-            Expires: <span style={{ color: "white" }}>
-              {formatExpiryDate(premiumStatus.expiresAt)}
-            </span>
-          </p>
-        </div>
+        <p style={{ color: "rgb(209, 213, 219)", fontSize: "0.875rem" }}>
+          Plan: {premiumStatus.plan} • Expires: {formatExpiryDate(premiumStatus.expiresAt)}
+        </p>
       </div>
     );
   };
@@ -936,238 +847,168 @@ const ProfilePage = () => {
   return (
     <div style={{
       minHeight: "100vh",
-      padding: "3rem 1rem"
+      padding: "3rem 1rem",
+      background: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
     }}>
-      <div style={{
-        maxWidth: "48rem",
-        margin: "0 auto"
-      }}>
+      <div style={{ maxWidth: "4xl", margin: "0 auto" }}>
+        {/* Profile Header */}
         <div style={{
           backgroundColor: "rgba(255, 255, 255, 0.1)",
           backdropFilter: "blur(16px)",
           borderRadius: "1rem",
           padding: "2rem",
+          marginBottom: "2rem",
           border: "1px solid rgba(255, 255, 255, 0.2)"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+              <div style={{
+                height: "4rem",
+                width: "4rem",
+                borderRadius: "9999px",
+                background: "linear-gradient(to bottom right, rgb(124, 58, 237), rgb(37, 99, 235))",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                position: "relative"
+              }}>
+                <span style={{ fontSize: "1.5rem", fontWeight: "bold", color: "white" }}>
+                  {user.name ? user.name.charAt(0).toUpperCase() : user.username?.charAt(0).toUpperCase() || "U"}
+                </span>
+                <button style={{
+                  position: "absolute",
+                  bottom: "-0.25rem",
+                  right: "-0.25rem",
+                  backgroundColor: "rgba(255, 255, 255, 0.2)",
+                  border: "none",
+                  borderRadius: "9999px",
+                  padding: "0.25rem",
+                  cursor: "pointer",
+                  opacity: 0
+                }}>
+                  <Camera size={14} color="white" />
+                </button>
+              </div>
+              <div>
+                <h1 style={{ fontSize: "1.875rem", fontWeight: "bold", color: "white", marginBottom: "0.25rem" }}>
+                  {user.name || user.username}
+                </h1>
+                <p style={{ color: "rgb(156, 163, 175)" }}>{user.email}</p>
+                <div style={{
+                  marginTop: "0.5rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem"
+                }}>
+                  <div style={{
+                    backgroundColor: "rgba(124, 58, 237, 0.2)",
+                    borderRadius: "9999px",
+                    padding: "0.25rem 0.75rem",
+                    fontSize: "0.75rem",
+                    color: "rgb(216, 180, 254)"
+                  }}>
+                    {profileCompletion}% Complete
+                  </div>
+                  {premiumStatus.isActive && (
+                    <div style={{
+                      backgroundColor: "rgba(34, 197, 94, 0.2)",
+                      borderRadius: "9999px",
+                      padding: "0.25rem 0.75rem",
+                      fontSize: "0.75rem",
+                      color: "rgb(74, 222, 128)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.25rem"
+                    }}>
+                      <Crown size={12} />
+                      Premium
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                padding: "0.75rem 1rem",
+                backgroundColor: isEditing ? "rgba(220, 38, 38, 0.2)" : "rgba(124, 58, 237, 0.2)",
+                border: `1px solid ${isEditing ? "rgba(248, 113, 113, 0.3)" : "rgba(139, 92, 246, 0.3)"}`,
+                borderRadius: "0.5rem",
+                color: isEditing ? "rgb(248, 113, 113)" : "rgb(216, 180, 254)",
+                cursor: "pointer",
+                fontSize: "0.875rem",
+                fontWeight: "500"
+              }}
+            >
+              {isEditing ? <X size={16} /> : <Edit2 size={16} />}
+              {isEditing ? "Cancel" : "Edit Profile"}
+            </button>
+          </div>
+          
+          {/* Progress Bar */}
+          <div style={{
+            backgroundColor: "rgba(255, 255, 255, 0.1)",
+            borderRadius: "9999px",
+            height: "0.5rem",
+            overflow: "hidden"
+          }}>
+            <div style={{
+              backgroundColor: "rgb(124, 58, 237)",
+              height: "100%",
+              width: `${profileCompletion}%`,
+              transition: "width 0.3s ease"
+            }} />
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div style={{
+          backgroundColor: "rgba(255, 255, 255, 0.1)",
+          backdropFilter: "blur(16px)",
+          borderRadius: "1rem",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+          overflow: "hidden"
         }}>
           <div style={{
             display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: "2rem"
+            borderBottom: "1px solid rgba(255, 255, 255, 0.1)"
           }}>
-            <h1 style={{
-              fontSize: "1.875rem",
-              fontWeight: "bold",
-              color: "white"
-            }}>My Profile</h1>
-            
-            {!isEditing ? (
+            {['profile', 'preferences', 'referrals'].map((tab) => (
               <button
-                onClick={() => setIsEditing(true)}
+                key={tab}
+                onClick={() => setActiveTab(tab)}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  padding: "0.5rem 1rem",
-                  backgroundColor: "rgba(124, 58, 237, 0.3)",
-                  color: "rgb(229, 209, 255)",
-                  border: "1px solid rgba(167, 139, 250, 0.3)",
-                  borderRadius: "0.5rem",
+                  flex: 1,
+                  padding: "1rem",
+                  backgroundColor: activeTab === tab ? "rgba(124, 58, 237, 0.2)" : "transparent",
+                  border: "none",
+                  color: activeTab === tab ? "rgb(216, 180, 254)" : "rgb(209, 213, 219)",
                   cursor: "pointer",
-                  transition: "background-color 0.2s"
+                  textTransform: "capitalize",
+                  fontWeight: "500",
+                  borderBottom: activeTab === tab ? "2px solid rgb(124, 58, 237)" : "2px solid transparent"
                 }}
               >
-                <Edit2 size={16} />
-                <span>Edit Profile</span>
+                {tab === 'profile' && <User size={16} style={{ marginRight: "0.5rem", display: "inline" }} />}
+                {tab === 'preferences' && <Settings size={16} style={{ marginRight: "0.5rem", display: "inline" }} />}
+                {tab === 'referrals' && <Users size={16} style={{ marginRight: "0.5rem", display: "inline" }} />}
+                {tab}
               </button>
-            ) : (
-              <button
-                onClick={() => setIsEditing(false)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  padding: "0.5rem 1rem",
-                  backgroundColor: "rgba(220, 38, 38, 0.3)",
-                  color: "rgb(254, 202, 202)",
-                  border: "1px solid rgba(248, 113, 113, 0.3)",
-                  borderRadius: "0.5rem",
-                  cursor: "pointer",
-                  transition: "background-color 0.2s"
-                }}
-              >
-                <X size={16} />
-                <span>Cancel</span>
-              </button>
-            )}
+            ))}
           </div>
           
-          <div style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "2rem"
-          }}>
-            <div style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              position: "relative"
-            }}>
-              <div style={{ position: "relative" }}>
-                <div style={{
-                  height: "8rem",
-                  width: "8rem",
-                  borderRadius: "9999px",
-                  background: "linear-gradient(to bottom right, rgb(168, 85, 247), rgb(59, 130, 246))",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "2.25rem",
-                  fontWeight: "bold",
-                  color: "white",
-                  marginBottom: "1rem"
-                }}>
-                  {user.name ? user.name.charAt(0).toUpperCase() : user.username?.charAt(0).toUpperCase() || "U"}
-                </div>
-                
-                {isEditing && (
-                  <div style={{
-                    position: "absolute",
-                    inset: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: "rgba(0, 0, 0, 0.5)",
-                    borderRadius: "9999px",
-                    opacity: 0,
-                    transition: "opacity 0.2s",
-                    cursor: "pointer"
-                  }}>
-                    <button style={{
-                      color: "white",
-                      padding: "0.5rem",
-                      borderRadius: "9999px",
-                      backgroundColor: "rgb(124, 58, 237)",
-                      border: "none",
-                      cursor: "pointer"
-                    }}>
-                      <Camera size={24} />
-                    </button>
-                  </div>
-                )}
-                
-                {/* Profile completion indicator */}
-                {profileCompletion < 100 && !isEditing && (
-                  <div style={{
-                    position: "absolute",
-                    right: 0,
-                    bottom: "1rem",
-                    width: "2rem",
-                    height: "2rem",
-                    borderRadius: "9999px",
-                    backgroundColor: profileCompletion >= 70 ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)",
-                    border: "2px solid rgba(0, 0, 0, 0.5)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "white",
-                    fontSize: "0.75rem",
-                    fontWeight: "bold"
-                  }}>
-                    {profileCompletion}%
-                  </div>
-                )}
-              </div>
-              
-              <h2 style={{
-                fontSize: "1.25rem",
-                fontWeight: "600",
-                color: "white",
-                marginBottom: "0.25rem"
-              }}>
-                {user.name || user.username}
-              </h2>
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.25rem",
-                color: "rgb(209, 213, 219)"
-              }}>
-                <Mail size={16} />
-                <span style={{ fontSize: "0.875rem" }}>{user.email}</span>
-              </div>
-              
-              {/* Tab navigation */}
-              <div style={{
-                display: "flex",
-                gap: "1rem",
-                marginTop: "2rem",
-                borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
-                width: "100%"
-              }}>
-                <button
-                  onClick={() => { setActiveTab('profile'); setIsEditing(false); }}
-                  style={{
-                    padding: "0.5rem 1rem",
-                    color: activeTab === 'profile' ? "white" : "rgb(156, 163, 175)",
-                    fontWeight: activeTab === 'profile' ? "600" : "normal",
-                    borderBottom: activeTab === 'profile' ? "2px solid rgb(124, 58, 237)" : "none",
-                    marginBottom: "-1px",
-                    backgroundColor: "transparent",
-                    border: "none",
-                    cursor: "pointer"
-                  }}
-                >
-                  Profile
-                </button>
-                <button
-                  onClick={() => { setActiveTab('preferences'); setIsEditing(false); }}
-                  style={{
-                    padding: "0.5rem 1rem",
-                    color: activeTab === 'preferences' ? "white" : "rgb(156, 163, 175)",
-                    fontWeight: activeTab === 'preferences' ? "600" : "normal",
-                    borderBottom: activeTab === 'preferences' ? "2px solid rgb(124, 58, 237)" : "none",
-                    marginBottom: "-1px",
-                    backgroundColor: "transparent",
-                    border: "none",
-                    cursor: "pointer"
-                  }}
-                >
-                  Preferences
-                </button>
-                <button
-                  onClick={() => { setActiveTab('referrals'); setIsEditing(false); }}
-                  style={{
-                    padding: "0.5rem 1rem",
-                    color: activeTab === 'referrals' ? "white" : "rgb(156, 163, 175)",
-                    fontWeight: activeTab === 'referrals' ? "600" : "normal",
-                    borderBottom: activeTab === 'referrals' ? "2px solid rgb(124, 58, 237)" : "none",
-                    marginBottom: "-1px",
-                    backgroundColor: "transparent",
-                    border: "none",
-                    cursor: "pointer"
-                  }}
-                >
-                  Referrals
-                </button>
-              </div>
-            </div>
-            
-            <div style={{ marginTop: "1rem" }}>
-              {isEditing ? (
-                renderProfileForm()
-              ) : activeTab === 'profile' ? (
-                renderProfileTab()
-              ) : activeTab === 'preferences' ? (
-                renderPreferencesTab()
-              ) : (
-                renderReferralsTab()
-              )}
-            </div>
+          <div style={{ padding: "2rem" }}>
+            {activeTab === 'profile' && (isEditing ? renderProfileForm() : renderProfileTab())}
+            {activeTab === 'preferences' && renderPreferencesTab()}
+            {activeTab === 'referrals' && renderReferralsTab()}
           </div>
         </div>
       </div>
+      
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes spin {
           from { transform: rotate(0deg); }

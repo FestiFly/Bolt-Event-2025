@@ -112,7 +112,10 @@ const DiscoveryPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center"
+      style={{
+        background: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
+      }}>
         <div className="text-center">
           <Loader className="h-12 w-12 text-purple-400 animate-spin mx-auto mb-4" />
           <p className="text-white text-xl">Discovering amazing festivals for you...</p>
@@ -122,8 +125,15 @@ const DiscoveryPage = () => {
   }
 
   return (
-    <div className="min-h-screen py-8 px-4">
-      <div className="max-w-7xl mx-auto">
+    <div style={{
+      minHeight: "100vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "3rem 1rem",
+      backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
+    }}>
+      <div className="max-w-[80%] mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-4">
             Festival Discoveries
@@ -141,33 +151,29 @@ const DiscoveryPage = () => {
             <Filter className="h-5 w-5 text-purple-400 ml-2" />
             <button
               onClick={() => setFilter('all')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filter === 'all' ? 'bg-purple-600 text-white' : 'text-gray-300 hover:text-white'
-              }`}
+              className={`px-4 py-2 rounded-lg transition-colors ${filter === 'all' ? 'bg-purple-600 text-white' : 'text-gray-300 hover:text-white'
+                }`}
             >
               All Festivals
             </button>
             <button
               onClick={() => setFilter('positive')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filter === 'positive' ? 'bg-green-600 text-white' : 'text-gray-300 hover:text-white'
-              }`}
+              className={`px-4 py-2 rounded-lg transition-colors ${filter === 'positive' ? 'bg-green-600 text-white' : 'text-gray-300 hover:text-white'
+                }`}
             >
               🎉 Highly Rated
             </button>
             <button
               onClick={() => setFilter('neutral')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filter === 'neutral' ? 'bg-yellow-600 text-white' : 'text-gray-300 hover:text-white'
-              }`}
+              className={`px-4 py-2 rounded-lg transition-colors ${filter === 'neutral' ? 'bg-yellow-600 text-white' : 'text-gray-300 hover:text-white'
+                }`}
             >
               😐 Mixed Reviews
             </button>
             <button
               onClick={() => setFilter('negative')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filter === 'negative' ? 'bg-red-600 text-white' : 'text-gray-300 hover:text-white'
-              }`}
+              className={`px-4 py-2 rounded-lg transition-colors ${filter === 'negative' ? 'bg-red-600 text-white' : 'text-gray-300 hover:text-white'
+                }`}
             >
               😕 Lower Rated
             </button>
@@ -198,13 +204,13 @@ const DiscoveryPage = () => {
                   <span className="text-white text-xs font-medium">{getVibeLabel(festival.vibe_score)}</span>
                 </div>
               </div>
-              
+
               <div className="p-6">
                 <h3 className="text-xl font-bold text-white mb-2 line-clamp-2">{festival.title}</h3>
                 <p className="text-gray-300 mb-4 text-sm leading-relaxed">
                   {truncateContent(festival.content)}
                 </p>
-                
+
                 <div className="space-y-3 mb-6">
                   <div className="flex items-center space-x-2 text-gray-300">
                     <MapPin className="h-4 w-4 text-purple-400" />

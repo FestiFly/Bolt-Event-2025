@@ -13,3 +13,5 @@ textblob
 google-generativeai
 duckduckgo-search
 beautifulsoup4
+google-auth 
+google-auth-oauthlib 

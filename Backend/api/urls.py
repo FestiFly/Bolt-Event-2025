@@ -20,6 +20,7 @@ urlpatterns = [
     path('organizer/festivals/', list_organizer_festivals, name='list-festivals'),
     path('organizer/festival/<str:fest_id>/update/', update_festival, name='update-festival'),
     path('organizer/festival/<str:fest_id>/delete/', delete_festival, name='delete-festival'),
+    path('organizer/google-auth/', organizer_google_auth, name='organizer-google-auth'),
 
 
     #user urls
@@ -29,9 +30,11 @@ urlpatterns = [
     path('user/profile/', user_profile, name='user-profile'),
     path('user/update-profile/', update_profile, name='update-profile'),
     path('user/apply-referral/', apply_referral, name='apply-referral'),
+    path('user/google-auth/', google_auth, name='google-auth'),
 
 
     #test urls
     path('heygen-generate/', generate_heygen_video, name='generate_heygen_video'),
     path('payment-success/', payment_success, name='payment-success'),
+    path('subscription/status/', check_subscription_status, name='check_subscription_status'),
 ]

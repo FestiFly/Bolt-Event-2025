@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Music, Calendar, Settings, Home, User, LogOut, ChevronDown, UserCircle, UserPlus } from 'lucide-react';
+import Cookies from 'js-cookie';
 
 const Navigation = () => {
   const location = useLocation();
@@ -9,16 +10,44 @@ const Navigation = () => {
   const [user, setUser] = useState<any>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => {
+    if (path === '/organizer') {
+      return location.pathname === '/organizer' || location.pathname === '/organizer/panel';
+    }
+    return location.pathname === path;
+  };
 
-  // Check authentication status and get current user
+  // Decode JWT token to get user data
+  const decodeJWT = (token: string) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      console.error('Error decoding JWT:', error);
+      return null;
+    }
+  };
+
+  // Check authentication status and get current user from JWT
   useEffect(() => {
-    const userJson = localStorage.getItem('festifly_user');
-    if (userJson) {
-      try {
-        setUser(JSON.parse(userJson));
-      } catch (e) {
-        setUser(null);
+    const token = Cookies.get('jwt');
+    if (token) {
+      const decodedToken = decodeJWT(token);
+      if (decodedToken && decodedToken.exp > Date.now() / 1000) {
+        setUser({
+          id: decodedToken.user_id,
+          username: decodedToken.username,
+          email: decodedToken.email,
+          // Use username as fallback for name if not available
+          name: decodedToken.name || decodedToken.username
+        });
+      } else {
+        // Token expired, clear it
+        handleLogout();
       }
     } else {
       setUser(null);
@@ -40,23 +69,62 @@ const Navigation = () => {
   }, []);
 
   const isAuthenticated = (): boolean => {
-    return !!localStorage.getItem('festifly_token');
+    const token = Cookies.get('jwt');
+    if (!token) return false;
+    
+    const decodedToken = decodeJWT(token);
+    return !!(decodedToken && decodedToken.exp > Date.now() / 1000);
   };
 
-  // Handle logout
+  // Check if user is an organizer (has organizer token)
+  const isOrganizer = (): boolean => {
+    const organizerToken = localStorage.getItem('organizerToken');
+    return !!organizerToken;
+  };
+
+  // Complete logout function - clears everything
   const handleLogout = () => {
+    // Clear all cookies
+    Cookies.remove('jwt');
+    Cookies.remove('festifly_token'); // Clean up legacy
+    
+    // Clear all localStorage items (clean up legacy)
     localStorage.removeItem('festifly_token');
     localStorage.removeItem('festifly_user');
+    localStorage.removeItem('jwt');
+    localStorage.removeItem('organizerToken'); // Clear organizer token
+    
+    // Clear sessionStorage as well
+    sessionStorage.clear();
+    
+    // Reset user state
+    setUser(null);
     setIsDropdownOpen(false);
+    
+    // Navigate to home
     navigate('/');
-    window.location.reload(); // Refresh to update state
+    
+    // Force page reload to ensure all state is cleared
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
+  };
+
+  // Handle organizer logout (separate from regular logout)
+  const handleOrganizerLogout = () => {
+    localStorage.removeItem('organizerToken');
+    Cookies.remove('jwt');
+    setIsDropdownOpen(false);
+    navigate('/organizer');
   };
   
   return (
     <nav style={{
       backgroundColor: "rgba(0, 0, 0, 0.2)",
       backdropFilter: "blur(16px)",
-      borderBottom: "1px solid rgba(255, 255, 255, 0.1)"
+      borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+      position: "relative",
+      zIndex: 1000
     }}>
       <div style={{
         maxWidth: "80rem",
@@ -91,6 +159,7 @@ const Navigation = () => {
             <Home size={16} />
             <span>Home</span>
           </Link>
+          
           <Link
             to="/discover"
             style={{
@@ -110,9 +179,10 @@ const Navigation = () => {
             <span>Discover</span>
           </Link>
           
-          {isAuthenticated() && (
+          {/* Organizer link - show for organizers or if on organizer pages */}
+          {(isOrganizer() || location.pathname.startsWith('/organizer')) && (
             <Link
-              to="/organizer"
+              to={isOrganizer() ? "/organizer/panel" : "/organizer"}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -151,10 +221,13 @@ const Navigation = () => {
                 height: "2rem",
                 width: "2rem",
                 borderRadius: "9999px",
-                background: "linear-gradient(to bottom right, rgb(124, 58, 237), rgb(37, 99, 235))",
+                background: isOrganizer() 
+                  ? "linear-gradient(to bottom right, rgb(34, 197, 94), rgb(16, 185, 129))" 
+                  : "linear-gradient(to bottom right, rgb(124, 58, 237), rgb(37, 99, 235))",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center"
+                justifyContent: "center",
+                position: "relative"
               }}>
                 {user ? (
                   <span style={{ color: "white", fontWeight: "500" }}>
@@ -162,6 +235,19 @@ const Navigation = () => {
                   </span>
                 ) : (
                   <UserCircle size={24} color="white" />
+                )}
+                {/* Organizer badge */}
+                {isOrganizer() && (
+                  <div style={{
+                    position: "absolute",
+                    top: "-2px",
+                    right: "-2px",
+                    width: "12px",
+                    height: "12px",
+                    backgroundColor: "rgb(34, 197, 94)",
+                    borderRadius: "50%",
+                    border: "2px solid rgba(0, 0, 0, 0.2)"
+                  }} />
                 )}
               </div>
               <ChevronDown 
@@ -180,24 +266,39 @@ const Navigation = () => {
                 position: "absolute",
                 right: 0,
                 marginTop: "0.5rem",
-                width: "12rem",
-                backgroundColor: "rgba(255, 255, 255, 0.1)",
-                backdropFilter: "blur(16px)",
+                width: "14rem",
+                backgroundColor: "rgba(0, 0, 0, 0.8)",
+                backdropFilter: "blur(10px)",
                 borderRadius: "0.5rem",
                 boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)",
                 border: "1px solid rgba(255, 255, 255, 0.2)",
-                zIndex: 50,
-                animation: "dropdownFade 0.2s ease-out forwards"
+                zIndex: 1050,
+                animation: "dropdownFade 0.2s ease-out forwards",
+                color: "#f1f1f1",
               }}>
-                {isAuthenticated() ? (
+                {isAuthenticated() || isOrganizer() ? (
                   <>
                     <div style={{
                       padding: "1rem",
                       borderBottom: "1px solid rgba(255, 255, 255, 0.1)"
                     }}>
-                      <p style={{ fontSize: "0.875rem", fontWeight: "500", color: "white" }}>
-                        {user?.name || user?.username}
-                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+                        <p style={{ fontSize: "0.875rem", fontWeight: "500", color: "white" }}>
+                          {user?.name || user?.username || "User"}
+                        </p>
+                        {isOrganizer() && (
+                          <span style={{
+                            fontSize: "0.625rem",
+                            backgroundColor: "rgb(34, 197, 94)",
+                            color: "white",
+                            padding: "0.125rem 0.375rem",
+                            borderRadius: "0.25rem",
+                            fontWeight: "500"
+                          }}>
+                            ORGANIZER
+                          </span>
+                        )}
+                      </div>
                       <p style={{
                         fontSize: "0.75rem",
                         color: "rgb(209, 213, 219)",
@@ -205,44 +306,99 @@ const Navigation = () => {
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap"
                       }}>
-                        {user?.email}
+                        {user?.email || ""}
                       </p>
                     </div>
-                    <Link 
-                      to="/profile" 
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                        padding: "0.5rem 1rem",
-                        fontSize: "0.875rem",
-                        color: "rgb(209, 213, 219)",
-                        textDecoration: "none"
-                      }}
-                      onClick={() => setIsDropdownOpen(false)}
-                    >
-                      <User size={16} />
-                      <span>View Profile</span>
-                    </Link>
-                    <button 
-                      onClick={handleLogout}
-                      style={{
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "0.5rem 1rem",
-                        fontSize: "0.875rem",
-                        color: "rgb(252, 165, 165)",
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.5rem"
-                      }}
-                    >
-                      <LogOut size={16} />
-                      <span>Logout</span>
-                    </button>
+
+                    {/* Regular user options */}
+                    {isAuthenticated() && (
+                      <Link 
+                        to="/profile" 
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                          padding: "0.5rem 1rem",
+                          fontSize: "0.875rem",
+                          color: "rgb(209, 213, 219)",
+                          textDecoration: "none"
+                        }}
+                        onClick={() => setIsDropdownOpen(false)}
+                      >
+                        <User size={16} />
+                        <span>View Profile</span>
+                      </Link>
+                    )}
+
+                    {/* Organizer-specific options */}
+                    {isOrganizer() && (
+                      <>
+                        <Link 
+                          to="/organizer/panel" 
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.5rem",
+                            padding: "0.5rem 1rem",
+                            fontSize: "0.875rem",
+                            color: "rgb(209, 213, 219)",
+                            textDecoration: "none"
+                          }}
+                          onClick={() => setIsDropdownOpen(false)}
+                        >
+                          <Settings size={16} />
+                          <span>Organizer Panel</span>
+                        </Link>
+                        
+                        <div style={{ height: "1px", backgroundColor: "rgba(255, 255, 255, 0.1)", margin: "0.25rem 0" }} />
+                        
+                        <button 
+                          onClick={handleOrganizerLogout}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            padding: "0.5rem 1rem",
+                            fontSize: "0.875rem",
+                            color: "rgb(252, 165, 165)",
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.5rem"
+                          }}
+                        >
+                          <LogOut size={16} />
+                          <span>Logout from Organizer</span>
+                        </button>
+                      </>
+                    )}
+
+                    {/* Regular logout for authenticated users */}
+                    {isAuthenticated() && (
+                      <>
+                        <div style={{ height: "1px", backgroundColor: "rgba(255, 255, 255, 0.1)", margin: "0.25rem 0" }} />
+                        <button 
+                          onClick={handleLogout}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            padding: "0.5rem 1rem",
+                            fontSize: "0.875rem",
+                            color: "rgb(252, 165, 165)",
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.5rem"
+                          }}
+                        >
+                          <LogOut size={16} />
+                          <span>Logout</span>
+                        </button>
+                      </>
+                    )}
                   </>
                 ) : (
                   <>
@@ -261,6 +417,23 @@ const Navigation = () => {
                     >
                       <User size={16} />
                       <span>Login</span>
+                    </Link>
+                    
+                    <Link 
+                      to="/organizer" 
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        padding: "0.5rem 1rem",
+                        fontSize: "0.875rem",
+                        color: "rgb(34, 197, 94)",
+                        textDecoration: "none"
+                      }}
+                      onClick={() => setIsDropdownOpen(false)}
+                    >
+                      <Settings size={16} />
+                      <span>Organizer Login</span>
                     </Link>
                   </>
                 )}
