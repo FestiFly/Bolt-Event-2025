@@ -228,7 +228,7 @@ const ProfilePage = () => {
       
       // If subscription has expired, update the local user object
       if (data.is_expired && !data.is_active) {
-        setUser(prev => {
+        setUser((prev: { premium: any; }) => {
           // Make sure prev exists before updating
           if (!prev) return prev;
           
@@ -847,7 +847,8 @@ const ProfilePage = () => {
   return (
     <div style={{
       minHeight: "100vh",
-      padding: "3rem 1rem"
+      padding: "3rem 1rem",
+      background: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
     }}>
       <div style={{ maxWidth: "4xl", margin: "0 auto" }}>
         {/* Profile Header */}

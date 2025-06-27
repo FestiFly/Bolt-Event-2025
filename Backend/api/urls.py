@@ -20,6 +20,7 @@ urlpatterns = [
     path('organizer/festivals/', list_organizer_festivals, name='list-festivals'),
     path('organizer/festival/<str:fest_id>/update/', update_festival, name='update-festival'),
     path('organizer/festival/<str:fest_id>/delete/', delete_festival, name='delete-festival'),
+    path('organizer/google-auth/', organizer_google_auth, name='organizer-google-auth'),
 
 
     #user urls

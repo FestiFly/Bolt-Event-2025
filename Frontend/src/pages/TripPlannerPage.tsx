@@ -244,7 +244,7 @@ const TripPlannerPage = () => {
 
       const data = await response.json();
       console.log('Video API Response:', data);
-      
+
       if (response.ok) {
         if (data.video_url) {
           setVideoUrl(data.video_url);
@@ -416,7 +416,10 @@ const TripPlannerPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center"
+        style={{
+          background: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
+        }}>
         <div className="text-center">
           <Loader className="h-12 w-12 text-purple-400 animate-spin mx-auto mb-4" />
           <p className="text-white text-xl">Loading festival details...</p>
@@ -427,7 +430,10 @@ const TripPlannerPage = () => {
 
   if (error && !festival) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center"
+        style={{
+          background: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
+        }}>
         <div className="text-center">
           <p className="text-white text-xl mb-4">Error: {error}</p>
           <button
@@ -443,7 +449,10 @@ const TripPlannerPage = () => {
 
   if (!festival) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center"
+        style={{
+          background: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
+        }}>
         <div className="text-center">
           <p className="text-white text-xl">Festival not found</p>
           <button
@@ -458,7 +467,14 @@ const TripPlannerPage = () => {
   }
 
   return (
-    <div className="min-h-screen py-8 px-4">
+    <div style={{
+      minHeight: "100vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "3rem 1rem",
+      backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
+    }}>
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center mb-8">
           <button
@@ -883,7 +899,7 @@ const TripPlannerPage = () => {
                       <p className="text-red-200 text-sm">Powered by Tavus AI</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     {videoUrl && !loadingVideo && (
                       <button
@@ -894,7 +910,7 @@ const TripPlannerPage = () => {
                         {isVideoFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
                       </button>
                     )}
-                    
+
                     {!loadingVideo && (
                       <button
                         onClick={regenerateVideo}
@@ -938,9 +954,9 @@ const TripPlannerPage = () => {
                 ) : videoUrl ? (
                   <div className="flex-1 flex flex-col">
                     <div className={`rounded-lg overflow-hidden border border-red-400/30 bg-black ${isVideoFullscreen ? 'flex-1' : 'aspect-video'} mb-4`}>
-                      <video 
+                      <video
                         ref={videoRef}
-                        controls 
+                        controls
                         className="w-full h-full rounded-lg"
                         poster={getRandomImage()}
                       >
@@ -948,7 +964,7 @@ const TripPlannerPage = () => {
                         Your browser does not support the video tag.
                       </video>
                     </div>
-                    
+
                     {videoScript && !isVideoFullscreen && (
                       <div className="bg-red-600/10 text-left text-sm text-red-200 p-4 rounded-lg border border-red-400/20 max-h-48 overflow-y-auto">
                         <div className="flex items-center justify-between mb-3">
@@ -1011,11 +1027,10 @@ const TripPlannerPage = () => {
                         key={lang.code}
                         onClick={() => setVoiceLang(lang.code)}
                         disabled={loadingVoice}
-                        className={`p-3 rounded-lg border transition-all transform hover:scale-105 ${
-                          voiceLang === lang.code
-                            ? 'bg-blue-600 border-blue-400 text-white shadow-lg'
-                            : 'bg-blue-600/20 border-blue-400/30 text-blue-200 hover:bg-blue-600/30'
-                        } ${loadingVoice ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`p-3 rounded-lg border transition-all transform hover:scale-105 ${voiceLang === lang.code
+                          ? 'bg-blue-600 border-blue-400 text-white shadow-lg'
+                          : 'bg-blue-600/20 border-blue-400/30 text-blue-200 hover:bg-blue-600/30'
+                          } ${loadingVoice ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <div className="flex items-center space-x-2">
                           <span className="text-lg">{lang.flag}</span>
@@ -1165,7 +1180,7 @@ const TripPlannerPage = () => {
         )}
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
