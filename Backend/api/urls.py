@@ -18,6 +18,7 @@ urlpatterns = [
     path('organizer/login/', organizer_login, name='organizer-login'),
     path('organizer/festival/create/', create_festival, name='create-festival'),
     path('organizer/festivals/', list_organizer_festivals, name='list-festivals'),
+    path('user/festival-preferences/', get_festivals_by_user_preference, name='get_festivals_by_user_preference'),
     path('organizer/festival/<str:fest_id>/update/', update_festival, name='update-festival'),
     path('organizer/festival/<str:fest_id>/delete/', delete_festival, name='delete-festival'),
     path('payment-success/', payment_success, name='payment-success'),
