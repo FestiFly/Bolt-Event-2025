@@ -267,13 +267,14 @@ const Navigation = () => {
                 right: 0,
                 marginTop: "0.5rem",
                 width: "14rem",
-                backgroundColor: "rgba(255, 255, 255, 0.1)",
-                backdropFilter: "blur(16px)",
+                backgroundColor: "rgba(0, 0, 0, 0.8)",
+                backdropFilter: "blur(10px)",
                 borderRadius: "0.5rem",
                 boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)",
                 border: "1px solid rgba(255, 255, 255, 0.2)",
                 zIndex: 1050,
-                animation: "dropdownFade 0.2s ease-out forwards"
+                animation: "dropdownFade 0.2s ease-out forwards",
+                color: "#f1f1f1",
               }}>
                 {isAuthenticated() || isOrganizer() ? (
                   <>

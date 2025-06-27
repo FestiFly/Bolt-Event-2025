@@ -34,7 +34,7 @@ const OrganizerPanel = () => {
       navigate('/organizer');
       return;
     }
-    
+
     fetchFestivals();
   }, [navigate]);
 
@@ -80,7 +80,7 @@ const OrganizerPanel = () => {
 
   const handleDeleteFestival = async (id: string) => {
     if (!confirm("Are you sure you want to delete this festival?")) return;
-    
+
     try {
       await fetch(`http://127.0.0.1:8000/api/organizer/festival/${id}/delete/`, {
         method: "DELETE"
@@ -130,9 +130,14 @@ const OrganizerPanel = () => {
   };
 
   const filteredFestivals = festivals.filter(festival => {
-    const matchesSearch = festival.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         festival.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         festival.subreddit.toLowerCase().includes(searchTerm.toLowerCase());
+    const festivalName = festival.name || '';
+    const festivalLocation = festival.location || '';
+    const festivalSubreddit = festival.subreddit || '';
+
+    const matchesSearch = festivalName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      festivalLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      festivalSubreddit.toLowerCase().includes(searchTerm.toLowerCase());
+
     const matchesStatus = statusFilter === 'all' || festival.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -156,7 +161,14 @@ const OrganizerPanel = () => {
   }
 
   return (
-    <div className="min-h-screen py-8 px-4 bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900">
+    <div style={{
+      minHeight: "100vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "3rem 1rem",
+      backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
+    }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -261,7 +273,7 @@ const OrganizerPanel = () => {
                 className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <Filter className="h-5 w-5 text-gray-400" />
               <select
@@ -404,8 +416,8 @@ const OrganizerPanel = () => {
               </thead>
               <tbody>
                 {filteredFestivals.map((festival, index) => (
-                  <tr 
-                    key={festival.id} 
+                  <tr
+                    key={festival.id}
                     className="border-b border-white/10 hover:bg-white/5 transition-colors"
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
@@ -470,8 +482,8 @@ const OrganizerPanel = () => {
                 <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-white mb-2">No Festivals Found</h3>
                 <p className="text-gray-400 mb-4">
-                  {searchTerm || statusFilter !== 'all' 
-                    ? 'No festivals match your current filters.' 
+                  {searchTerm || statusFilter !== 'all'
+                    ? 'No festivals match your current filters.'
                     : 'No festivals have been added yet.'}
                 </p>
                 {(searchTerm || statusFilter !== 'all') && (
@@ -491,7 +503,7 @@ const OrganizerPanel = () => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }

@@ -4,7 +4,7 @@ import json
 from pymongo import MongoClient
 from django.contrib.auth.hashers import make_password, check_password
 import jwt
-from datetime import datetime
+from datetime import datetime, timedelta
 from bson import ObjectId
 
 SECRET_KEY = 'FetiFly' 
@@ -85,7 +85,8 @@ def organizer_login(request):
             payload = {
                 "organizer_id": str(organizer["_id"]),
                 "username": organizer["username"],
-                "location": organizer["location"]
+                "location": organizer["location"],
+                "exp": datetime.utcnow() + timedelta(hours=1)
             }
             token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
