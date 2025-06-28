@@ -39,5 +39,6 @@ urlpatterns = [
 
     #test urls
     path('heygen-generate/', generate_heygen_video, name='generate_heygen_video'),
+    path("ask/", ask_bot, name="ask_bot")
 
 ]
