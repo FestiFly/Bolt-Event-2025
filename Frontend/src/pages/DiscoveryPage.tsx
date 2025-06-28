@@ -696,7 +696,10 @@ const DiscoveryPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center "
-        style={{ backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))" }}>
+        style={{ 
+          backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))",
+          backgroundAttachment: "fixed",
+         }}>
         <div className="text-center">
           <Loader className="h-12 w-12 text-purple-400 animate-spin mx-auto mb-4" />
           <p className="text-white text-xl">Discovering amazing festivals for you...</p>
@@ -706,11 +709,13 @@ const DiscoveryPage = () => {
   }
 
   return (
-    <div className="min-h-screen py-8 px-4" style={{ backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))" }}>
+    <div className="min-h-screen py-8 px-4" style={{ backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))",
+      backgroundAttachment: "fixed",
+     }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="text-center mb-4 items-center">
-          <h1 className="text-4xl font-bold text-white mb-4 bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold text-white mb-4 bg-clip-text text-transparent">
             Festival Discoveries
           </h1>
           <div className='flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0 sm:space-x-4 mb-6'>
@@ -1017,7 +1022,7 @@ const DiscoveryPage = () => {
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Location Filter */}
                 <div>
-                  <label className="block text-white font-medium mb-2 flex items-center space-x-2">
+                  <label className="text-white font-medium mb-2 flex items-center space-x-2">
                     <MapPin className="h-4 w-4 text-purple-400" />
                     <span>Location</span>
                   </label>
@@ -1035,7 +1040,7 @@ const DiscoveryPage = () => {
 
                 {/* Month Filter */}
                 <div>
-                  <label className="block text-white font-medium mb-2 flex items-center space-x-2">
+                  <label className="text-white font-medium mb-2 flex items-center space-x-2">
                     <Calendar className="h-4 w-4 text-purple-400" />
                     <span>Month</span>
                   </label>
@@ -1053,7 +1058,7 @@ const DiscoveryPage = () => {
 
                 {/* Minimum Upvotes */}
                 <div>
-                  <label className="block text-white font-medium mb-2 flex items-center space-x-2">
+                  <label className="text-white font-medium mb-2 flex items-center space-x-2">
                     <TrendingUp className="h-4 w-4 text-purple-400" />
                     <span>Min Upvotes</span>
                   </label>
@@ -1069,7 +1074,7 @@ const DiscoveryPage = () => {
 
                 {/* Sort By */}
                 <div>
-                  <label className="block text-white font-medium mb-2 flex items-center space-x-2">
+                  <label className="text-white font-medium mb-2 flex items-center space-x-2">
                     <Star className="h-4 w-4 text-purple-400" />
                     <span>Sort By</span>
                   </label>
@@ -1088,7 +1093,7 @@ const DiscoveryPage = () => {
 
               {/* Tags Filter */}
               <div>
-                <label className="block text-white font-medium mb-3 flex items-center space-x-2">
+                <label className="text-white font-medium mb-3 flex items-center space-x-2">
                   <Tag className="h-4 w-4 text-purple-400" />
                   <span>Festival Types</span>
                 </label>
@@ -1286,7 +1291,7 @@ const DiscoveryPage = () => {
         )}
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }

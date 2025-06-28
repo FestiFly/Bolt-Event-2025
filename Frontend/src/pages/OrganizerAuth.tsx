@@ -17,12 +17,12 @@ const GOOGLE_CLIENT_ID = "417585596392-pvibn0rqis2ka0hjesis5k1imten2am8.apps.goo
 // Function to store auth data for organizers
 const storeOrganizerAuthData = (token: string): void => {
   // Store JWT token in cookie with proper settings
-  Cookies.set(AUTH_TOKEN_KEY, token, { 
+  Cookies.set(AUTH_TOKEN_KEY, token, {
     expires: 7,
     secure: false, // Set to true in production with HTTPS
     sameSite: 'lax'
   });
-  
+
   // Store organizer token in localStorage for organizer-specific checks
   localStorage.setItem(ORGANIZER_TOKEN_KEY, token);
 };
@@ -68,10 +68,10 @@ const OrganizerAuth = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-  const [signupForm, setSignupForm] = useState({ 
+  const [signupForm, setSignupForm] = useState({
     name: '',           // This will be used as username
-    email: '', 
-    password: '', 
+    email: '',
+    password: '',
     confirmPassword: '',
     location: '',       // Add this field
     phone: ''           // This will be sent as phone_number
@@ -112,22 +112,22 @@ const OrganizerAuth = () => {
 
       // Store authentication data using the same pattern as UserLogin
       storeOrganizerAuthData(response.data.token);
-      
+
       setMessage('Authentication successful! Redirecting to organizer panel...');
-      
+
       console.log('Organizer authenticated successfully, token:', response.data.token);
-      
+
       // Navigate to organizer panel after a brief delay
       setTimeout(() => {
         navigate('/organizer/panel');
         window.location.reload(); // Reload to update navigation state
       }, 1000);
-      
+
     } catch (error: any) {
       console.error('Organizer login error:', error);
       setError(
-        error.response?.data?.error || 
-        error.response?.data?.message || 
+        error.response?.data?.error ||
+        error.response?.data?.message ||
         'Invalid credentials. Please check your email and password.'
       );
     } finally {
@@ -186,8 +186,8 @@ const OrganizerAuth = () => {
 
     } catch (error: any) {
       setError(
-        error.response?.data?.error || 
-        error.response?.data?.message || 
+        error.response?.data?.error ||
+        error.response?.data?.message ||
         'Failed to create account. Please check your information and try again.'
       );
     } finally {
@@ -200,40 +200,40 @@ const OrganizerAuth = () => {
     setIsLoading(true);
     setError(null);
     setMessage(null);
-    
+
     try {
       // Send the ID token to your backend
       const response = await axios.post(`${API_URL}/organizer/google-auth/`, {
         token: credentialResponse.credential
       });
-      
+
       if (!response.data.token) {
         throw new Error('No token received from server');
       }
-      
+
       // Store authentication data
       storeOrganizerAuthData(response.data.token);
-      
+
       setMessage('Google authentication successful! Redirecting to organizer panel...');
-      
+
       // Navigate to organizer panel after a brief delay
       setTimeout(() => {
         navigate('/organizer/panel');
         window.location.reload();
       }, 1000);
-      
+
     } catch (error: any) {
       console.error('Google login error:', error);
       setError(
-        error.response?.data?.error || 
-        error.response?.data?.message || 
+        error.response?.data?.error ||
+        error.response?.data?.message ||
         'Failed to authenticate with Google. Please try again or use email login.'
       );
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   // Handle Google login error
   const handleGoogleError = () => {
     setError('Google sign-in failed. Please try again or use email login.');
@@ -263,7 +263,11 @@ const OrganizerAuth = () => {
 
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <div className="min-h-screen flex items-center justify-center py-12 px-4 bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900">
+      <div className="min-h-screen flex items-center justify-center py-12 px-4 "
+        style={{
+          backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))",
+          backgroundAttachment: "fixed"
+        }}>
         <div className="max-w-md w-full">
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20 overflow-hidden">
             {/* Header */}
@@ -278,8 +282,8 @@ const OrganizerAuth = () => {
                 Organizer Portal
               </h2>
               <p className="text-gray-300">
-                {activeTab === 'login' 
-                  ? 'Access your festival management dashboard' 
+                {activeTab === 'login'
+                  ? 'Access your festival management dashboard'
                   : 'Create your organizer account to get started'
                 }
               </p>
@@ -289,11 +293,10 @@ const OrganizerAuth = () => {
             <div className="flex border-b border-white/20">
               <button
                 onClick={() => switchTab('login')}
-                className={`flex-1 py-4 px-6 font-semibold transition-all ${
-                  activeTab === 'login'
+                className={`flex-1 py-4 px-6 font-semibold transition-all ${activeTab === 'login'
                     ? 'bg-purple-600/20 text-purple-200 border-b-2 border-purple-400'
                     : 'text-gray-300 hover:text-white hover:bg-white/5'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-center gap-2">
                   <User className="h-4 w-4" />
@@ -302,11 +305,10 @@ const OrganizerAuth = () => {
               </button>
               <button
                 onClick={() => switchTab('signup')}
-                className={`flex-1 py-4 px-6 font-semibold transition-all ${
-                  activeTab === 'signup'
+                className={`flex-1 py-4 px-6 font-semibold transition-all ${activeTab === 'signup'
                     ? 'bg-purple-600/20 text-purple-200 border-b-2 border-purple-400'
                     : 'text-gray-300 hover:text-white hover:bg-white/5'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-center gap-2">
                   <UserPlus className="h-4 w-4" />
@@ -400,14 +402,14 @@ const OrganizerAuth = () => {
                       </>
                     )}
                   </button>
-                  
+
                   {/* Add divider */}
                   <div className="flex items-center my-6">
                     <div className="flex-grow h-px bg-white/20"></div>
                     <span className="px-4 text-sm text-gray-400">OR</span>
                     <div className="flex-grow h-px bg-white/20"></div>
                   </div>
-                  
+
                   {/* Google Sign-In Button */}
                   <div className="flex justify-center">
                     <GoogleLogin
@@ -479,7 +481,7 @@ const OrganizerAuth = () => {
                       disabled={isLoading}
                     />
                   </div>
- 
+
                   <div>
                     <label className="block text-white font-medium mb-2 flex items-center space-x-2">
                       <Phone className="h-4 w-4 text-purple-400" />
@@ -587,14 +589,14 @@ const OrganizerAuth = () => {
                       </>
                     )}
                   </button>
-                  
+
                   {/* Add divider for signup too */}
                   <div className="flex items-center my-6">
                     <div className="flex-grow h-px bg-white/20"></div>
                     <span className="px-4 text-sm text-gray-400">OR</span>
                     <div className="flex-grow h-px bg-white/20"></div>
                   </div>
-                  
+
                   {/* Google Sign-In Button for Signup */}
                   <div className="flex justify-center">
                     <GoogleLogin
@@ -617,7 +619,7 @@ const OrganizerAuth = () => {
                   <Shield className="h-4 w-4" />
                   <span>Secure authentication powered by FestiFly</span>
                 </div>
-                
+
                 {activeTab === 'login' ? (
                   <p className="mt-4 text-gray-400 text-sm">
                     Don't have an organizer account?{' '}
