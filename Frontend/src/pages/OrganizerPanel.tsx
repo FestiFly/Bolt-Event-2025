@@ -308,7 +308,8 @@ const OrganizerPanel = () => {
       alignItems: "center",
       justifyContent: "center",
       padding: "3rem 1rem",
-      backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
+      backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))",
+      backgroundAttachment: "fixed"
     }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}

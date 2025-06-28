@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, ExternalLink, Video, Mic, Plus, Clock, Star, Share, Heart, ThumbsUp, Loader, MessageCircle, TrendingUp, Play, Pause, Volume2, Download, CheckCircle, Globe, Headphones, Navigation, Compass, Route, Car, Plane, Train, Film, Maximize, Minimize, RotateCcw } from 'lucide-react';
-import { jwtDecode }  from 'jwt-decode';
+import { ArrowLeft, MapPin, Calendar, ExternalLink, Video, Mic, Plus, Clock, Star, Share, Heart, ThumbsUp, Loader, MessageCircle, TrendingUp, Play, Pause, Volume2, Download, CheckCircle, Globe, Headphones, Navigation, Compass, Route, Car, Plane, Train, Film, Maximize, Minimize, RotateCcw, X } from 'lucide-react';
+import { jwtDecode } from 'jwt-decode';
 import Cookies from 'js-cookie';
+import { Component } from '../components/glass-icons';
+import WhatsappIcon from '../assets/share/WhatsApp.svg';
+import TelegramIcon from '../assets/share/telegram.svg';
+import DiscordIcon from '../assets/share/Discord.png';
+import EmailIcon from '../assets/share/Gmail.png';
+import TwitterIcon from '../assets/share/x.png';
+import InstagramIcon from '../assets/share/Instagram.svg';
 
 interface FestivalDetail {
+  url: string | undefined;
   _id: string;
   title: string;
   location: string;
@@ -50,7 +58,7 @@ const TripPlannerPage = () => {
   const [userPlan, setUserPlan] = useState<string | null>(null);
   const [voiceUsageLeft, setVoiceUsageLeft] = useState<number | null>(null);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
-
+  const [showShareModal, setShowShareModal] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -77,14 +85,11 @@ const TripPlannerPage = () => {
   }, []);
 
   useEffect(() => {
-    // Get and decode JWT token to determine user plan
     const token = Cookies.get('jwt');
     if (token) {
       try {
         const decoded: any = jwtDecode(token);
         setUserPlan(decoded.plan || null);
-        
-        // Fetch voice usage statistics from the server
         fetchVoiceUsageStats();
       } catch (error) {
         console.error("Failed to decode JWT:", error);
@@ -124,16 +129,13 @@ const TripPlannerPage = () => {
       setLoading(false);
       return;
     }
-
     try {
       const response = await fetch('http://localhost:8000/api/festival-detail/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ _id: festivalId })
       });
-
       const data = await response.json();
-
       if (response.ok) {
         setFestival(data.festival);
       } else {
@@ -142,7 +144,6 @@ const TripPlannerPage = () => {
     } catch (error) {
       console.error('Error fetching festival details:', error);
       setError('Failed to connect to server');
-
       setTimeout(() => {
         const mockFestival: FestivalDetail = {
           _id: festivalId!,
@@ -154,9 +155,9 @@ const TripPlannerPage = () => {
           month: "October",
           vibe_score: 0.06,
           content: "Hi all! I'm the owner of Astronox, a music and arts festival taking place Oct 17-21 at Valkyrie Ranch in Paige, TX. I've decided to share my budget publicly because I think this is very important to help the community understand just what it takes to make these things possible. Please let me know if you have any questions and I'll be happy to answer them! Hopefully this helps people understand what it takes to make these events possible. Astronox.net",
-          fetched_at: "2025-06-17T06:12:16.835"
+          fetched_at: "2025-06-17T06:12:16.835",
+          url: undefined
         };
-
         setFestival(mockFestival);
         setError(null);
       }, 1000);
@@ -168,24 +169,19 @@ const TripPlannerPage = () => {
   const fetchVoiceUsageStats = async () => {
     const token = Cookies.get('jwt');
     if (!token) return;
-    
     try {
       const response = await fetch('http://localhost:8000/api/subscription/status/', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      
       if (response.ok) {
         const data = await response.json();
-        
-        // Set remaining usage based on plan
         if (data.plan === 'yearly') {
-          setVoiceUsageLeft(null); // Unlimited
+          setVoiceUsageLeft(null);
         } else if (data.plan === 'monthly') {
           setVoiceUsageLeft(5 - (data.voice_usage || 0));
         } else {
-          // Free user
           setVoiceUsageLeft(2 - (data.voice_usage || 0));
         }
       }
@@ -200,15 +196,12 @@ const TripPlannerPage = () => {
 
   const generateGoogleCalendarLink = () => {
     if (!festival) return '';
-
     const festivalName = encodeURIComponent(festival.title);
     const festivalLocation = encodeURIComponent(festival.location);
     const festivalDescription = encodeURIComponent(festival.content || 'Discover this amazing festival experience...');
-
     const festivalDate = new Date(`${festival.month} 1, 2024`).toISOString().replace(/[-:]/g, '').replace('Z', '');
     const startDate = festivalDate.substring(0, 8) + 'T000000';
     const endDate = festivalDate.substring(0, 8) + 'T235959';
-
     return `https://www.google.com/calendar/render?action=TEMPLATE&text=${festivalName}&dates=${startDate}/${endDate}&details=${festivalDescription}&location=${festivalLocation}`;
   };
 
@@ -222,23 +215,19 @@ const TripPlannerPage = () => {
 
   const handlePlayVideo = async () => {
     if (!festival) return;
-
     setShowVideoModal(true);
     setLoadingVideo(true);
     setVideoScript(null);
     setVideoUrl(null);
     setVideoError(null);
-
     try {
       const response = await fetch("http://localhost:8000/api/heygen-generate/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ _id: festival._id, language: voiceLang })
       });
-
       const data = await response.json();
       console.log('Video API Response:', data);
-
       if (response.ok) {
         if (data.video_url) {
           setVideoUrl(data.video_url);
@@ -258,6 +247,45 @@ const TripPlannerPage = () => {
       setLoadingVideo(false);
     }
   };
+
+  const shareLinks = [
+    {
+      icon: <img src={WhatsappIcon} alt="WhatsApp" className="w-10 h-10" />,
+      color: "#15bd2b",
+      label: "WhatsApp",
+      url: `https://wa.me/?text=Check%20out%20this%20festival:%20${encodeURIComponent(window.location.href)}`,
+    },
+    {
+      icon: <img src={TelegramIcon} alt="Telegram" className="w-14 h-14" />,
+      color: "#157fbd",
+      label: "Telegram",
+      url: `https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=Check%20this%20out!`,
+    },
+    {
+      icon: <img src={DiscordIcon} alt="Discord" className="w-20 h-14" />,
+      color: "#5e15bd",
+      label: "Discord",
+      url: `https://discord.com/channels/@me`,
+    },
+    {
+      icon: <img src={EmailIcon} alt="Email" className="w-16 h-12" />,
+      color: "#e6ae17",
+      label: "Email",
+      url: `mailto:?subject=Check%20this%20festival&body=Check%20out%20this%20festival:%20${encodeURIComponent(window.location.href)}`,
+    },
+    {
+      icon: <img src={TwitterIcon} alt="Twitter" className="w-16 h-16" />,
+      color: "#000000",
+      label: "Twitter",
+      url: `https://twitter.com/intent/tweet?text=Check%20out%20this%20festival:%20${encodeURIComponent(window.location.href)}`,
+    },
+    {
+      icon: <img src={InstagramIcon} alt="Instagram" className="w-10 h-10" />,
+      color: "#c90a50",
+      label: "Instagram",
+      url: `https://www.instagram.com/`,
+    },
+  ];
 
   const closeVideoModal = () => {
     if (videoRef.current) {
@@ -291,23 +319,16 @@ const TripPlannerPage = () => {
 
   const handleVoiceAssistant = async () => {
     if (!festival) return;
-
-    // Check if user is logged in
     const token = Cookies.get('jwt');
     if (!token) {
       setVoiceError("Please log in to use the voice assistant feature.");
       setShowVoiceModal(true);
       return;
     }
-
     try {
-      // Decode token to get user info and plan
       const decoded: any = jwtDecode(token);
       const plan = decoded.plan;
-      
-      // Free user restrictions
       if (!plan) {
-        // Check if language is not English
         if (voiceLang !== 'en') {
           setVoiceLang('en');
           setVoiceError("Free users can only generate voice in English. Please upgrade to access more languages.");
@@ -315,8 +336,6 @@ const TripPlannerPage = () => {
           setShowUpgradePrompt(true);
           return;
         }
-        
-        // Check usage limits directly from the latest state
         if (voiceUsageLeft !== null && voiceUsageLeft <= 0) {
           setVoiceError("You have reached the voice generation limit for free users. Please upgrade to generate more audio briefings.");
           setShowVoiceModal(true);
@@ -324,49 +343,38 @@ const TripPlannerPage = () => {
           return;
         }
       }
-      
-      // Monthly plan restrictions
       if (plan === 'monthly' && voiceUsageLeft !== null && voiceUsageLeft <= 0) {
         setVoiceError("You have reached the voice generation limit for your monthly plan. Please upgrade to our yearly plan for unlimited voice briefings.");
         setShowVoiceModal(true);
         setShowUpgradePrompt(true);
         return;
       }
-
-      // Proceed with voice generation
       setShowVoiceModal(true);
       setLoadingVoice(true);
       setVoiceScript(null);
       setAudioUrl(null);
       setIsPlaying(false);
       setVoiceError(null);
-
       const response = await fetch("http://localhost:8000/api/generate-voice-briefing/", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({ _id: festival._id, language: voiceLang }),
       });
-
       const data = await response.json();
       console.log("Voice API Response:", data);
-
       if (response.ok && data.script) {
         setVoiceScript(data.script);
         setVoiceError(null);
-
         if (data.audio_url) {
           setAudioUrl(`http://localhost:8000${data.audio_url}`);
         } else if (data.audio_blob) {
           const blobUrl = base64ToBlobUrl(data.audio_blob);
           setAudioUrl(blobUrl);
         }
-        
-        // Update the voice usage count in our state
         if (plan !== 'yearly') {
-          // Refresh usage stats after successful generation
           setTimeout(() => fetchVoiceUsageStats(), 1000);
         }
       } else {
@@ -411,29 +419,23 @@ const TripPlannerPage = () => {
     if (langCode === 'en' || userPlan === 'yearly' || userPlan === 'monthly') {
       setVoiceLang(langCode);
     } else {
-      setVoiceLang('en'); // Default to English
+      setVoiceLang('en');
       setShowUpgradePrompt(true);
     }
   };
 
   const getLanguageButtonClass = (langCode: string) => {
     const isSelected = voiceLang === langCode;
-    
-    // English is always available
     if (langCode === 'en') {
-      return isSelected 
-        ? 'bg-blue-600 border-blue-400 text-white shadow-lg' 
+      return isSelected
+        ? 'bg-blue-600 border-blue-400 text-white shadow-lg'
         : 'bg-blue-600/20 border-blue-400/30 text-blue-200 hover:bg-blue-600/30';
     }
-    
-    // For other languages, check plan
     if (userPlan === 'yearly' || userPlan === 'monthly') {
-      return isSelected 
-        ? 'bg-blue-600 border-blue-400 text-white shadow-lg' 
+      return isSelected
+        ? 'bg-blue-600 border-blue-400 text-white shadow-lg'
         : 'bg-blue-600/20 border-blue-400/30 text-blue-200 hover:bg-blue-600/30';
     }
-    
-    // Free users - locked state
     return 'bg-gray-600/20 border-gray-400/30 text-gray-400 cursor-not-allowed';
   };
 
@@ -453,7 +455,6 @@ const TripPlannerPage = () => {
   };
 
   const getRandomImage = () => {
-    // Array of festival-related image URLs
     const images = [
       'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80',
       'https://images.unsplash.com/photo-1506157786151-b8491531f063?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80',
@@ -566,7 +567,10 @@ const TripPlannerPage = () => {
       alignItems: "center",
       justifyContent: "center",
       padding: "3rem 1rem",
-      backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
+      backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))",
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      backgroundAttachment: "fixed",
     }}>
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center mb-8">
@@ -578,7 +582,6 @@ const TripPlannerPage = () => {
             <span>Back to Discovery</span>
           </button>
         </div>
-
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
             <div className="relative rounded-2xl overflow-hidden group">
@@ -609,14 +612,36 @@ const TripPlannerPage = () => {
                     <button className="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-all hover:scale-110">
                       <Heart className="h-5 w-5 text-white" />
                     </button>
-                    <button className="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-all hover:scale-110">
+                    <button
+                      onClick={() => setShowShareModal(true)}
+                      className="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-all hover:scale-110"
+                    >
                       <Share className="h-5 w-5 text-white" />
                     </button>
                   </div>
                 </div>
               </div>
             </div>
+            {showShareModal && (
+              <div className="fixed inset-0 z-50 grid place-items-center p-4 backdrop-blur-sm animate-fade-in">
+                <div className="w-full max-w-md bg-gradient-to-br from-white/50 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-2xl shadow-black/50 animate-scale-in">
+                  <div className="flex justify-between items-start mb-6">
+                    <h3 className="text-3xl font-semibold text-neutral-800 border-b border-slate-800 pb-1">
+                      Share this event
+                    </h3>
 
+                    <button
+                      onClick={() => setShowShareModal(false)}
+                      className="p-1 rounded-full hover:bg-white/10 transition-colors"
+                      aria-label="Close share menu"
+                    >
+                      <X className="w-5 h-5 text-white/80 hover:text-white" />
+                    </button>
+                  </div>
+                  <Component items={shareLinks} className="!grid-cols-3 gap-8" />
+                </div>
+              </div>
+            )}
             <div className={`bg-white/10 backdrop-blur-lg rounded-2xl p-6 border-2 ${getVibeColor(festival.vibe_score)} hover:bg-white/15 transition-all duration-300`}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold text-white">About This Festival</h2>
@@ -625,11 +650,9 @@ const TripPlannerPage = () => {
                   <span className="text-sm text-gray-300 font-medium">{getVibeLabel(festival.vibe_score)}</span>
                 </div>
               </div>
-
               <p className="text-gray-300 leading-relaxed mb-6 text-lg">
                 {festival.content || 'Discover this amazing festival experience...'}
               </p>
-
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-white mb-3 flex items-center space-x-2">
@@ -651,7 +674,6 @@ const TripPlannerPage = () => {
                     </div>
                   </div>
                 </div>
-
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-white mb-3 flex items-center space-x-2">
                     <TrendingUp className="h-5 w-5 text-purple-400" />
@@ -671,7 +693,6 @@ const TripPlannerPage = () => {
                 </div>
               </div>
             </div>
-
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300">
               <h2 className="text-2xl font-bold text-white mb-4 flex items-center space-x-2">
                 <MessageCircle className="h-6 w-6 text-orange-400" />
@@ -700,7 +721,6 @@ const TripPlannerPage = () => {
                   <span>View on Reddit</span>
                 </a>
               </div>
-
               <button
                 onClick={handleFetchRedditReviews}
                 disabled={loadingReviews}
@@ -709,7 +729,6 @@ const TripPlannerPage = () => {
                 {loadingReviews ? (
                   <>
                     <Loader className="h-5 w-5 animate-spin" />
-                   
                   </>
                 ) : (
                   <>
@@ -719,7 +738,6 @@ const TripPlannerPage = () => {
                 )}
               </button>
             </div>
-
             {showReviews && reviews.length > 0 && (
               <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 animate-fadeIn">
                 <div className="flex items-center justify-between mb-6">
@@ -732,7 +750,6 @@ const TripPlannerPage = () => {
                     <span className="text-orange-200 text-sm font-medium">{reviews.length} reviews</span>
                   </div>
                 </div>
-
                 <div className="space-y-4 max-h-96 overflow-y-auto custom-scrollbar">
                   {reviews.map((review, index) => (
                     <div
@@ -759,7 +776,6 @@ const TripPlannerPage = () => {
                           <span>Source</span>
                         </a>
                       </div>
-
                       <p className="text-gray-300 leading-relaxed text-sm">
                         "{review.comment}"
                       </p>
@@ -768,7 +784,6 @@ const TripPlannerPage = () => {
                 </div>
               </div>
             )}
-
             {showReviews && reviews.length === 0 && (
               <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
                 <div className="text-center py-8">
@@ -779,11 +794,9 @@ const TripPlannerPage = () => {
               </div>
             )}
           </div>
-
           <div className="space-y-6">
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 space-y-4 hover:bg-white/15 transition-all duration-300">
               <h3 className="text-lg font-semibold text-white mb-4 text-center">Festival Actions</h3>
-
               <button
                 onClick={handleAddToCalendar}
                 className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
@@ -791,7 +804,6 @@ const TripPlannerPage = () => {
                 <Plus className="h-5 w-5" />
                 <span>Add to Calendar</span>
               </button>
-
               <button
                 onClick={handlePlayVideo}
                 className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-red-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:from-red-700 hover:to-pink-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
@@ -799,7 +811,6 @@ const TripPlannerPage = () => {
                 <Video className="h-5 w-5" />
                 <span>Watch AI Preview</span>
               </button>
-
               <button
                 onClick={handleVoiceAssistant}
                 className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-cyan-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
@@ -807,9 +818,8 @@ const TripPlannerPage = () => {
                 <Mic className="h-5 w-5" />
                 <span>Voice Assistant</span>
               </button>
-
               <a
-                href={festival.reddit_url}
+                href={festival.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
@@ -818,13 +828,11 @@ const TripPlannerPage = () => {
                 <span>View Original Post</span>
               </a>
             </div>
-
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
                 <Navigation className="h-5 w-5 text-green-400" />
                 <span>Location & Navigation</span>
               </h3>
-
               <div className="bg-gray-800/50 rounded-lg mb-4 h-48 flex items-center justify-center border border-gray-600/30 relative overflow-hidden group">
                 <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-blue-600/20"></div>
                 <div className="text-center z-10">
@@ -834,7 +842,6 @@ const TripPlannerPage = () => {
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent group-hover:from-black/40 transition-all"></div>
               </div>
-
               <div className="space-y-3">
                 <a
                   href={getGoogleMapsDirectionsUrl(festival.location)}
@@ -845,7 +852,6 @@ const TripPlannerPage = () => {
                   <Route className="h-4 w-4" />
                   <span>Get Directions</span>
                 </a>
-
                 <div className="grid grid-cols-3 gap-2">
                   <button className="flex flex-col items-center space-y-1 p-3 bg-blue-600/20 text-blue-200 border border-blue-400/30 rounded-lg hover:bg-blue-600/30 transition-all hover:scale-105">
                     <Car className="h-4 w-4" />
@@ -862,7 +868,6 @@ const TripPlannerPage = () => {
                 </div>
               </div>
             </div>
-
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
                 <Star className="h-5 w-5 text-yellow-400" />
@@ -898,7 +903,6 @@ const TripPlannerPage = () => {
                 )}
               </div>
             </div>
-
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
                 <Compass className="h-5 w-5 text-cyan-400" />
@@ -911,14 +915,12 @@ const TripPlannerPage = () => {
                   </div>
                   <p className="text-cyan-200 text-sm">Check weather forecast for {festival.month} in {festival.location}</p>
                 </div>
-
                 <div className="p-3 bg-yellow-600/20 rounded-lg border border-yellow-400/30">
                   <div className="flex items-center space-x-2 mb-2">
                     <span className="text-yellow-400 text-sm font-medium">🎫 Tickets</span>
                   </div>
                   <p className="text-yellow-200 text-sm">Book early for better prices and availability</p>
                 </div>
-
                 <div className="p-3 bg-pink-600/20 rounded-lg border border-pink-400/30">
                   <div className="flex items-center space-x-2 mb-2">
                     <span className="text-pink-400 text-sm font-medium">🏨 Accommodation</span>
@@ -929,7 +931,6 @@ const TripPlannerPage = () => {
             </div>
           </div>
         </div>
-
         {showCalendarModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-md w-full border border-white/20 transform animate-scale-in">
@@ -979,7 +980,6 @@ const TripPlannerPage = () => {
             </div>
           </div>
         )}
-
         {showVideoModal && (
           <div className={`fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 ${isVideoFullscreen ? 'bg-black/90' : ''}`}>
             <div className={`bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 transform animate-scale-in ${isVideoFullscreen ? 'max-w-6xl w-full h-full max-h-screen' : 'max-w-4xl w-full'}`}>
@@ -992,7 +992,6 @@ const TripPlannerPage = () => {
                       <p className="text-red-200 text-sm">Powered by Tavus AI</p>
                     </div>
                   </div>
-
                   <div className="flex items-center space-x-2">
                     {videoUrl && !loadingVideo && (
                       <button
@@ -1003,7 +1002,6 @@ const TripPlannerPage = () => {
                         {isVideoFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
                       </button>
                     )}
-
                     {!loadingVideo && (
                       <button
                         onClick={regenerateVideo}
@@ -1015,7 +1013,6 @@ const TripPlannerPage = () => {
                     )}
                   </div>
                 </div>
-
                 {loadingVideo ? (
                   <div className="flex-1 flex items-center justify-center">
                     <div className="text-center">
@@ -1057,7 +1054,6 @@ const TripPlannerPage = () => {
                         Your browser does not support the video tag.
                       </video>
                     </div>
-
                     {videoScript && !isVideoFullscreen && (
                       <div className="bg-red-600/10 text-left text-sm text-red-200 p-4 rounded-lg border border-red-400/20 max-h-48 overflow-y-auto">
                         <div className="flex items-center justify-between mb-3">
@@ -1082,7 +1078,6 @@ const TripPlannerPage = () => {
                     </div>
                   </div>
                 )}
-
                 <div className="flex gap-3 mt-6">
                   <button
                     onClick={closeVideoModal}
@@ -1095,7 +1090,6 @@ const TripPlannerPage = () => {
             </div>
           </div>
         )}
-
         {showVoiceModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-2xl w-full border border-white/20 transform animate-scale-in">
@@ -1107,24 +1101,20 @@ const TripPlannerPage = () => {
                     <p className="text-blue-200 text-sm">Multilingual Festival Briefing</p>
                   </div>
                 </div>
-
                 <div className="bg-blue-600/10 rounded-lg p-4 mb-6 border border-blue-400/20">
                   <div className="flex items-center justify-center space-x-2 mb-4">
                     <Globe className="h-5 w-5 text-blue-400" />
                     <h4 className="text-blue-200 font-semibold">Select Language</h4>
                   </div>
-
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {languageOptions.map((lang) => (
                       <button
                         key={lang.code}
                         onClick={() => handleLanguageSelection(lang.code)}
                         disabled={loadingVoice || (lang.code !== 'en' && !userPlan)}
-                        className={`p-3 rounded-lg border transition-all transform ${
-                          lang.code === 'en' || userPlan ? 'hover:scale-105' : ''
-                        } ${getLanguageButtonClass(lang.code)} ${
-                          loadingVoice ? 'opacity-50 cursor-not-allowed' : ''
-                        }`}
+                        className={`p-3 rounded-lg border transition-all transform ${lang.code === 'en' || userPlan ? 'hover:scale-105' : ''
+                          } ${getLanguageButtonClass(lang.code)} ${loadingVoice ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
                       >
                         <div className="flex items-center space-x-2">
                           <span className="text-lg">{lang.flag}</span>
@@ -1141,18 +1131,15 @@ const TripPlannerPage = () => {
                       </button>
                     ))}
                   </div>
-
                   <div className="mt-3 text-center">
                     <p className="text-blue-300 text-xs">
                       Selected: {getSelectedLanguage().flag} {getSelectedLanguage().name} ({getSelectedLanguage().accent})
                     </p>
-                    
                     {voiceUsageLeft !== null && (
                       <p className="text-amber-300 text-xs mt-1">
                         {voiceUsageLeft} voice generation{voiceUsageLeft !== 1 ? 's' : ''} remaining
                       </p>
                     )}
-                    
                     {userPlan === 'yearly' && (
                       <p className="text-green-300 text-xs mt-1">
                         Unlimited voice generations available (Premium Plan)
@@ -1160,7 +1147,6 @@ const TripPlannerPage = () => {
                     )}
                   </div>
                 </div>
-
                 {loadingVoice ? (
                   <div className="bg-blue-600/20 rounded-lg p-6 mb-6 border border-blue-400/30">
                     <Loader className="h-8 w-8 text-blue-400 animate-spin mx-auto mb-4" />
@@ -1185,7 +1171,6 @@ const TripPlannerPage = () => {
                         </button>
                       </div>
                     )}
-
                     {audioUrl && !voiceError && (
                       <div className="bg-blue-600/20 rounded-lg p-6 mb-6 border border-blue-400/30">
                         <div className="flex items-center justify-center space-x-4 mb-4">
@@ -1199,14 +1184,12 @@ const TripPlannerPage = () => {
                               <Play className="h-6 w-6 text-white" />
                             )}
                           </button>
-
                           <div className="flex items-center space-x-2">
                             <Volume2 className="h-5 w-5 text-blue-400" />
                             <span className="text-blue-200 text-sm font-medium">
                               {getSelectedLanguage().flag} {getSelectedLanguage().name}
                             </span>
                           </div>
-
                           <a
                             href={audioUrl}
                             download={`festival-briefing-${festival._id}-${voiceLang}.mp3`}
@@ -1216,14 +1199,12 @@ const TripPlannerPage = () => {
                             <Download className="h-4 w-4 text-white" />
                           </a>
                         </div>
-
                         <audio
                           ref={audioRef}
                           src={audioUrl}
                           preload="auto"
                           style={{ display: 'none' }}
                         />
-
                         <div className="mt-3 text-center">
                           <p className="text-blue-200 text-sm">
                             🎧 AI-generated festival briefing ready!
@@ -1234,7 +1215,6 @@ const TripPlannerPage = () => {
                         </div>
                       </div>
                     )}
-
                     {voiceScript && !voiceError && (
                       <div className="bg-blue-600/10 rounded-lg p-4 mb-6 border border-blue-400/20 max-h-64 overflow-y-auto">
                         <div className="flex items-center justify-between mb-3">
@@ -1251,7 +1231,6 @@ const TripPlannerPage = () => {
                         </p>
                       </div>
                     )}
-
                     {!audioUrl && !voiceScript && !loadingVoice && !voiceError && (
                       <div className="bg-gray-600/20 rounded-lg p-6 mb-6 border border-gray-400/30">
                         <div className="text-center">
@@ -1267,7 +1246,6 @@ const TripPlannerPage = () => {
                     )}
                   </>
                 )}
-
                 <div className="flex gap-3">
                   {!loadingVoice && (
                     <button
@@ -1289,13 +1267,12 @@ const TripPlannerPage = () => {
             </div>
           </div>
         )}
-
         {showUpgradePrompt && (
           <div className="bg-purple-600/20 rounded-lg p-6 mb-6 border border-purple-400/30">
             <div className="text-center">
               <h4 className="text-purple-200 text-lg font-semibold mb-2">Upgrade Your Experience!</h4>
               <p className="text-purple-300 text-sm mb-4">
-                {!userPlan 
+                {!userPlan
                   ? "Get access to all languages and more voice generations with our premium plans"
                   : "Upgrade to yearly plan for unlimited voice generations"}
               </p>
@@ -1317,40 +1294,32 @@ const TripPlannerPage = () => {
           </div>
         )}
       </div>
-
       <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
-
         @keyframes scale-in {
           from { opacity: 0; transform: scale(0.9); }
           to { opacity: 1; transform: scale(1); }
         }
-
         .animate-fadeIn {
           animation: fadeIn 0.5s ease-out;
         }
-
         .animate-scale-in {
           animation: scale-in 0.3s ease-out;
         }
-
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
         }
-
         .custom-scrollbar::-webkit-scrollbar-track {
           background: rgba(255, 255, 255, 0.1);
           border-radius: 3px;
         }
-
         .custom-scrollbar::-webkit-scrollbar-thumb {
           background: rgba(147, 51, 234, 0.5);
           border-radius: 3px;
         }
-
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: rgba(147, 51, 234, 0.7);
         }
