@@ -1642,7 +1642,7 @@ def enhance_festival_ai(request):
 
 
 @csrf_exempt
-def generate_heygen_video(request):
+def generate_tavus_video(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST request required."}, status=400)
 
@@ -1652,57 +1652,118 @@ def generate_heygen_video(request):
         return JsonResponse({"error": "_id is required"}, status=400)
 
     doc = festival_collection.find_one({"_id": ObjectId(doc_id)})
-    if not doc or "ai_voice_script_en" not in doc:
-        return JsonResponse({"error": "Document or ai_voice_script_en not found"}, status=404)
 
-    input_text = doc["ai_voice_script_en"]
-    avatar_id = data.get("avatar_id", "Adriana_Business_Front_2_public")
-    voice_id = data.get("voice_id", "9ff7fd2dd9114c3bae005e62aa485e52")
-    # input_text = data.get("input_text", "Hello, this is a test from Heygen!")
+    # Check if video already exists
+    ai_video_data = doc.get("ai_video_data", {})
+    video_url = ai_video_data.get("en", {}).get("url")
+    if video_url:
+        return JsonResponse({"video_url": video_url})
+    
+    # Get script from ai_voice_data.en.script
+    ai_voice_data = doc.get("ai_voice_data", {})
+    script = ai_voice_data.get("en", {}).get("script")
+    if not doc or not script:
+        return JsonResponse({"error": "Explore the voice model before video generation"}, status=404)
+    
+    # Tavus API details
+    tavus_api_key = "703ba724213b46eca9a8eae6663dff22"
+    tavus_url = "https://tavusapi.com/v2/videos"
+    replica_id = data.get("replica_id", "rc2146c13e81")  # Default replica, can be customized
+    video_name = doc.get("title")
 
-    # Step 1: Generate video
-    url = "https://api.heygen.com/v2/video/generate"
     payload = {
-        "video_inputs": [
-            {
-                "avatar_id": avatar_id,
-                "voice": {
-                    "type": "text",
-                    "voice_id": voice_id,
-                    "input_text": input_text
-                },
-                "style": "TalkingHead"
-            }
-        ],
-        "caption": False,
-        "dimension": {"width": 1280, "height": 720}
+        "background_url": "",
+        "replica_id": replica_id,
+        "script": script,
+        "video_name": video_name,
     }
     headers = {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "x-api-key": HEYGEN_API_KEY
+        "x-api-key": tavus_api_key,
+        "Content-Type": "application/json"
     }
-    response = requests.post(url, json=payload, headers=headers)
+
+    # Step 1: Generate video
+    response = requests.post(tavus_url, json=payload, headers=headers)
+    if response.status_code != 200:
+        return JsonResponse({"error": "Failed to generate video", "details": response.text}, status=500)
     result = response.json()
-    video_id = result.get("data", {}).get("video_id")
+    video_id = result.get("video_id")
     if not video_id:
-        return JsonResponse({"error": "Failed to generate video", "details": result}, status=500)
+        return JsonResponse({"error": "Failed to get video_id from Tavus", "details": result}, status=500)
 
     # Step 2: Poll for video status
-    status_url = "https://api.heygen.com/v1/video_status.get"
-    status_headers = {
-        "accept": "application/json",
-        "x-api-key": HEYGEN_API_KEY
-    }
-    max_attempts = 20
+    status_url = f"https://tavusapi.com/v2/videos/{video_id}"
+    max_attempts = 70
+    video_data = None
     for _ in range(max_attempts):
-        status_response = requests.get(status_url, headers=status_headers, params={"video_id": video_id})
+        status_response = requests.get(status_url, headers=headers)
+        if status_response.status_code != 200:
+            time.sleep(5)
+            continue
         status_data = status_response.json()
-        video_status = status_data.get("data", {}).get("status")
+        video_status = status_data.get("status")
         if video_status == "completed":
-            return JsonResponse(status_data)
+            video_data = status_data
+            break
         elif video_status == "failed":
             return JsonResponse({"error": "Video generation failed", "details": status_data}, status=500)
         time.sleep(5)  # Wait before polling again
 
-    return JsonResponse({"error": "Video generation timed out", "video_id": video_id}, status=202)
+    if not video_data or not video_data.get("video_url"):
+        # Store a placeholder Tavus URL in the DB for pending videos
+        placeholder_url = f"https://tavus.video/{video_id}"
+        festival_collection.update_one(
+            {"_id": ObjectId(doc_id)},
+            {"$set": {
+                "ai_video_data.en.url": placeholder_url,
+                "ai_video_data.en.status": status_data.get("status", "pending"),
+                "ai_video_data.en.video_id": video_id
+            }}
+        )
+        return JsonResponse({
+            "status": status_data.get("status", "pending"),
+            "message": "Video is still processing. Please try again later.",
+            "video_id": video_id
+        }, status=202)
+        
+    # # Store the data key and video_url in ai_video_data.en
+    # festival_collection.update_one(
+    #     {"_id": ObjectId(doc_id)},
+    #     {"$set": {
+    #         "ai_video_data.en.data": video_data,
+    #         "ai_video_data.en.url": video_data.get("video_url")
+    #     }}
+    # )
+
+    return JsonResponse({
+        "video_url": video_data.get("video_url")
+    })
+    
+
+def fetch_dappier_data(query):
+    api_key = "ak_01jy34qz42ej5v1cayskwbxmy1"
+    endpoint = "https://api.dappier.com/app/datamodel/dm_01jysa2z8gergs66668z2010da"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    body = {"query": query}
+    response = requests.post(endpoint, headers=headers, json=body)
+    return response.json()
+
+@csrf_exempt
+def ask_bot(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            query = data.get("query", "")
+            if not query:
+                return JsonResponse({"error": "No query provided"}, status=400)
+
+            response = fetch_dappier_data(query)
+            return JsonResponse(response)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+    else:
+        return JsonResponse({"error": "Only POST method allowed"}, status=405)
