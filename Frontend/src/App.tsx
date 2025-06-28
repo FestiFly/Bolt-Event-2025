@@ -20,7 +20,7 @@ const decodeJWT = (token: string) => {
   try {
     const base64Url = token.split('.')[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
       return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
     }).join(''));
     return JSON.parse(jsonPayload);
@@ -33,7 +33,7 @@ const decodeJWT = (token: string) => {
 const isAuthenticated = (): boolean => {
   const token = Cookies.get('jwt');
   if (!token) return false;
-  
+
   const decodedToken = decodeJWT(token);
   return !!(decodedToken && decodedToken.exp > Date.now() / 1000);
 };
@@ -41,10 +41,10 @@ const isAuthenticated = (): boolean => {
 const isOrganizerAuthenticated = (): boolean => {
   const organizerToken = localStorage.getItem('organizerToken');
   const jwtToken = Cookies.get('jwt');
-  
+
   // Check if organizer token exists and JWT is valid
   if (!organizerToken || !jwtToken) return false;
-  
+
   const decodedToken = decodeJWT(jwtToken);
   return !!(decodedToken && decodedToken.exp > Date.now() / 1000);
 };
@@ -67,7 +67,7 @@ const setupAxiosInterceptors = (): void => {
       return Promise.reject(error);
     }
   );
-  
+
   // Handle authentication errors
   axios.interceptors.response.use(
     (response) => response,
@@ -78,7 +78,7 @@ const setupAxiosInterceptors = (): void => {
         localStorage.removeItem('organizerToken');
         localStorage.removeItem('festifly_token'); // Clean up legacy
         localStorage.removeItem('festifly_user'); // Clean up legacy
-        
+
         // Redirect based on current path
         const currentPath = window.location.pathname;
         if (currentPath.startsWith('/organizer')) {
@@ -117,7 +117,7 @@ function App() {
   // Set up axios interceptors and verify authentication on load
   useEffect(() => {
     setupAxiosInterceptors();
-    
+
     // Clean up any expired tokens on app load
     const token = Cookies.get('jwt');
     if (token) {
@@ -130,7 +130,7 @@ function App() {
         localStorage.removeItem('festifly_user');
       }
     }
-    
+
     setAuthChecked(true);
   }, []);
 
@@ -141,14 +141,16 @@ function App() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundImage: "linear-gradient(to bottom right, rgb(17, 24, 39), rgb(88, 28, 135), rgb(49, 46, 129))"
+        backgroundImage: "linear-gradient(to bottom right, rgb(17, 24, 39), rgb(88, 28, 135), rgb(49, 46, 129))",
+        backgroundAttachment: "fixed"
       }}>
         <div style={{
           color: "white",
           fontSize: "1.25rem",
           animation: "pulse 1.5s infinite"
         }}>Loading...</div>
-        <style dangerouslySetInnerHTML={{ __html: `
+        <style dangerouslySetInnerHTML={{
+          __html: `
           @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -163,7 +165,8 @@ function App() {
       <Router>
         <div style={{
           minHeight: "100vh",
-          backgroundImage: "linear-gradient(to bottom right, rgb(17, 24, 39), rgb(88, 28, 135), rgb(49, 46, 129))"
+          backgroundImage: "linear-gradient(to bottom right, rgb(17, 24, 39), rgb(88, 28, 135), rgb(49, 46, 129))",
+          backgroundAttachment: "fixed"
         }}>
           <Navigation />
           <Routes>
@@ -172,28 +175,28 @@ function App() {
             <Route path="/discover" element={<DiscoveryPage />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/trip/:festivalId" element={<TripPlannerPage />} />
-            
+
             {/* Organizer Routes */}
             <Route path="/organizer" element={<OrganizerAuth />} />
-            <Route 
-              path="/organizer/panel" 
+            <Route
+              path="/organizer/panel"
               element={
                 <OrganizerProtectedRoute>
                   <OrganizerPanel />
                 </OrganizerProtectedRoute>
-              } 
+              }
             />
-            
+
             {/* User Protected Routes */}
-            <Route 
-              path="/profile" 
+            <Route
+              path="/profile"
               element={
                 <ProtectedRoute>
                   <ProfilePage />
                 </ProtectedRoute>
-              } 
+              }
             />
-            
+
             {/* Catch all route */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
