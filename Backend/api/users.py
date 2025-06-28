@@ -926,7 +926,7 @@ def get_festivals_by_user_preference(request):
 
 @csrf_exempt
 def subscription_status(request):
-    """Get user subscription status and voice usage"""
+    """Get user subscription status, voice usage, and video usage"""
     if request.method != "GET":
         return JsonResponse({"error": "Only GET method is allowed."}, status=405)
     
@@ -955,15 +955,21 @@ def subscription_status(request):
         plan = premium.get('plan')
         expires_at = premium.get('expires_at')
         voice_usage = updated_user.get('voice_usage', 0)
+        video_usage = updated_user.get('video_usage', 0)
         
         # Calculate remaining usage based on plan
-        remaining_usage = None
+        remaining_voice_usage = None
+        remaining_video_usage = None
+        
         if plan == 'yearly':
-            remaining_usage = None  # Unlimited
+            remaining_voice_usage = None  # Unlimited voice
+            remaining_video_usage = max(0, 6 - video_usage)  # 6 videos
         elif plan == 'monthly':
-            remaining_usage = max(0, 5 - voice_usage)
+            remaining_voice_usage = max(0, 5 - voice_usage)  # 5 voice
+            remaining_video_usage = max(0, 2 - video_usage)  # 2 videos
         else:
-            remaining_usage = max(0, 2 - voice_usage)
+            remaining_voice_usage = max(0, 2 - voice_usage)  # 2 voice
+            remaining_video_usage = max(0, 1 - video_usage)  # 1 video
         
         # Format expiry date if available
         expiry_formatted = None
@@ -975,9 +981,23 @@ def subscription_status(request):
             "plan": plan,
             "expires_at": expiry_formatted,
             "voice_usage": voice_usage,
-            "remaining_usage": remaining_usage,
+            "video_usage": video_usage,
+            "remaining_voice_usage": remaining_voice_usage,
+            "remaining_video_usage": remaining_video_usage,
             "is_expired": premium.get('expired', False),
-            "need_renewal": is_active == False and premium.get('expired', False)
+            "need_renewal": is_active == False and premium.get('expired', False),
+            "limits": {
+                "voice": {
+                    "free": 2,
+                    "monthly": 5,
+                    "yearly": "unlimited"
+                },
+                "video": {
+                    "free": 1,
+                    "monthly": 2,
+                    "yearly": 6
+                }
+            }
         })
         
     except jwt.ExpiredSignatureError:

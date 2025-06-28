@@ -48,6 +48,8 @@ const TripPlannerPage = () => {
   const [loadingVoice, setLoadingVoice] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [calendarAdded, setCalendarAdded] = useState(false);
+  const [videoStatus, setVideoStatus] = useState<string | null>(null);
+  const [showWatchButton, setShowWatchButton] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [voiceLang, setVoiceLang] = useState("en");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -57,6 +59,7 @@ const TripPlannerPage = () => {
   const [isVideoFullscreen, setIsVideoFullscreen] = useState(false);
   const [userPlan, setUserPlan] = useState<string | null>(null);
   const [voiceUsageLeft, setVoiceUsageLeft] = useState<number | null>(null);
+  const [videoUsageLeft, setVideoUsageLeft] = useState<number | null>(null);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -91,6 +94,7 @@ const TripPlannerPage = () => {
         const decoded: any = jwtDecode(token);
         setUserPlan(decoded.plan || null);
         fetchVoiceUsageStats();
+        fetchVideoUsageStats();
       } catch (error) {
         console.error("Failed to decode JWT:", error);
         setUserPlan(null);
@@ -190,6 +194,35 @@ const TripPlannerPage = () => {
     }
   };
 
+  const fetchVideoUsageStats = async () => {
+    const token = Cookies.get('jwt');
+    if (!token) return;
+    try {
+      const response = await fetch('http://localhost:8000/api/subscription/status/', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Set voice usage
+        if (data.plan === 'yearly') {
+          setVoiceUsageLeft(null);
+        } else if (data.plan === 'monthly') {
+          setVoiceUsageLeft(data.remaining_voice_usage);
+        } else {
+          setVoiceUsageLeft(data.remaining_voice_usage);
+        }
+        
+        // Set video usage
+        setVideoUsageLeft(data.remaining_video_usage);
+      }
+    } catch (error) {
+      console.error("Error fetching usage stats:", error);
+    }
+  };
+
   const handleAddToCalendar = () => {
     setShowCalendarModal(true);
   };
@@ -215,34 +248,135 @@ const TripPlannerPage = () => {
 
   const handlePlayVideo = async () => {
     if (!festival) return;
+    
+    const token = Cookies.get('jwt');
+    if (!token) {
+      setVideoError("Please log in to use the video generation feature.");
+      setShowVideoModal(true);
+      return;
+    }
+    
+    try {
+      const decoded: any = jwtDecode(token);
+      const plan = decoded.plan;
+      
+      // Check video generation limits
+      if (!plan) {
+        // Free user
+        if (videoUsageLeft !== null && videoUsageLeft <= 0) {
+          setVideoError("You have reached the video generation limit for free users (1 video). Please upgrade to generate more videos.");
+          setShowVideoModal(true);
+          setShowUpgradePrompt(true);
+          return;
+        }
+      } else if (plan === 'monthly') {
+        // Monthly user
+        if (videoUsageLeft !== null && videoUsageLeft <= 0) {
+          setVideoError("You have reached the video generation limit for your monthly plan (2 videos). Upgrade to yearly for more videos.");
+          setShowVideoModal(true);
+          setShowUpgradePrompt(true);
+          return;
+        }
+      } else if (plan === 'yearly') {
+        // Yearly user
+        if (videoUsageLeft !== null && videoUsageLeft <= 0) {
+          setVideoError("You have reached the video generation limit for your yearly plan (6 videos).");
+          setShowVideoModal(true);
+          return;
+        }
+      }
+      
+    } catch (error) {
+      console.error("Failed to decode JWT:", error);
+    }
+    
     setShowVideoModal(true);
     setLoadingVideo(true);
     setVideoScript(null);
     setVideoUrl(null);
     setVideoError(null);
+    setVideoStatus(null);
+    setShowWatchButton(false);
+    
     try {
       const response = await fetch("http://localhost:8000/api/tavus-generate/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ _id: festival._id, language: voiceLang })
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ _id: festival._id })
       });
+      
       const data = await response.json();
       console.log('Video API Response:', data);
-      if (response.ok) {
-        if (data.video_url) {
-          setVideoUrl(data.video_url);
-          setVideoScript(data.script || null);
-          setVideoError(null);
-        } else {
-          setVideoError('Video URL not provided in response');
-        }
-      } else {
-        console.error("Video Generation Error:", data.error || "Invalid video response");
-        setVideoError(data.error || 'Failed to generate AI video');
+      
+      if (response.status === 403) {
+        // Usage limit exceeded
+        setVideoError(data.error);
+        setShowUpgradePrompt(true);
+        setLoadingVideo(false);
+        return;
       }
+      
+      if (response.status === 202) {
+        // Video is being processed - show watch button and stop loading
+        setVideoStatus(data.status);
+        setShowWatchButton(true);
+        setLoadingVideo(false);
+        
+        // Refresh usage stats after successful generation
+        fetchVideoUsageStats();
+        
+      } else if (response.ok && data.video_url) {
+        // Video is already completed
+        setVideoUrl(data.video_url);
+        setVideoStatus("completed");
+        setLoadingVideo(false);
+        
+      } else {
+        setVideoError(data.error || 'Failed to generate AI video');
+        setLoadingVideo(false);
+      }
+      
     } catch (error) {
       console.error("Failed to fetch AI video:", error);
       setVideoError('Network error occurred while generating video');
+      setLoadingVideo(false);
+    }
+  };
+  
+  const handleWatchVideo = async () => {
+    if (!festival) return;
+    
+    setLoadingVideo(true);
+    setShowWatchButton(false);
+    
+    try {
+      const response = await fetch("http://localhost:8000/api/get-tavus-video/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _id: festival._id })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.status === "completed" && data.video_url) {
+        setVideoUrl(data.video_url);
+        setVideoStatus("completed");
+        setVideoError(null);
+      } else if (response.status === 202) {
+        setVideoError("Video is still processing. Please try again in a moment.");
+        setShowWatchButton(true);
+      } else {
+        setVideoError("Video is not ready yet. Please try again later.");
+        setShowWatchButton(true);
+      }
+      
+    } catch (error) {
+      console.error("Error fetching video:", error);
+      setVideoError("Error loading video. Please try again.");
+      setShowWatchButton(true);
     } finally {
       setLoadingVideo(false);
     }
@@ -1029,8 +1163,17 @@ const TripPlannerPage = () => {
                     <div className="bg-red-600/20 rounded-lg p-8 border border-red-400/30 max-w-md">
                       <div className="text-center">
                         <Video className="h-12 w-12 text-red-400 mx-auto mb-4" />
-                        <h4 className="text-red-200 font-semibold mb-2">Video Generation Failed</h4>
+                        <h4 className="text-red-200 font-semibold mb-2">Video Issue</h4>
                         <p className="text-red-300 text-sm mb-4">❌ {videoError}</p>
+                        {showWatchButton && (
+                          <button
+                            onClick={handleWatchVideo}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center space-x-2 mx-auto mb-2"
+                          >
+                            <Play className="h-4 w-4" />
+                            <span>Try Watch Video</span>
+                          </button>
+                        )}
                         <button
                           onClick={regenerateVideo}
                           className="px-4 py-2 bg-red-600/50 text-red-200 rounded-lg hover:bg-red-600 transition-colors text-sm flex items-center space-x-2 mx-auto"
@@ -1041,31 +1184,69 @@ const TripPlannerPage = () => {
                       </div>
                     </div>
                   </div>
+                ) : showWatchButton ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="bg-blue-600/20 rounded-lg p-8 border border-blue-400/30 max-w-md">
+                        <Film className="h-16 w-16 text-blue-400 mx-auto mb-4 animate-pulse" />
+                        <h4 className="text-blue-200 font-semibold mb-2">Video Processing Complete!</h4>
+                        <p className="text-blue-300 text-sm mb-4">Your AI video has been generated and is ready to watch.</p>
+                        <button
+                          onClick={handleWatchVideo}
+                          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all transform hover:scale-105 flex items-center space-x-2 mx-auto"
+                        >
+                          <Play className="h-5 w-5" />
+                          <span>Watch Video</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 ) : videoUrl ? (
                   <div className="flex-1 flex flex-col">
-                    <div className={`rounded-lg overflow-hidden border border-red-400/30 bg-black ${isVideoFullscreen ? 'flex-1' : 'aspect-video'} mb-4`}>
-                      <video
-                        ref={videoRef}
-                        controls
-                        className="w-full h-full rounded-lg"
-                        poster={getRandomImage()}
-                      >
-                        <source src={videoUrl} type="video/mp4" />
-                        Your browser does not support the video tag.
-                      </video>
-                    </div>
-                    {videoScript && !isVideoFullscreen && (
-                      <div className="bg-red-600/10 text-left text-sm text-red-200 p-4 rounded-lg border border-red-400/20 max-h-48 overflow-y-auto">
+                    {/* Check if it's a Tavus URL that needs to be displayed in an iframe */}
+                    {videoUrl.includes('tavus.video/') ? (
+                      <div className={`rounded-lg overflow-hidden border border-red-400/30 bg-black ${isVideoFullscreen ? 'flex-1' : 'aspect-video'} mb-4`}>
+                        <iframe
+                          src={videoUrl}
+                          className="w-full h-full rounded-lg"
+                          allow="autoplay; fullscreen"
+                          allowFullScreen
+                          frameBorder="0"
+                          title="AI Festival Preview"
+                        />
+                      </div>
+                    ) : (
+                      <div className={`rounded-lg overflow-hidden border border-red-400/30 bg-black ${isVideoFullscreen ? 'flex-1' : 'aspect-video'} mb-4`}>
+                        <video
+                          ref={videoRef}
+                          controls
+                          className="w-full h-full rounded-lg"
+                          poster={getRandomImage()}
+                        >
+                          <source src={videoUrl} type="video/mp4" />
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
+                    )}
+                    
+                    {/* Video info section */}
+                    {!isVideoFullscreen && (
+                      <div className="bg-red-600/10 text-left text-sm text-red-200 p-4 rounded-lg border border-red-400/20">
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="text-red-300 font-semibold flex items-center space-x-2">
-                            <span>📜</span>
-                            <span>AI Script</span>
+                            <span>🎬</span>
+                            <span>AI Generated Video</span>
                           </h4>
                           <span className="text-red-300 text-xs bg-red-600/20 px-2 py-1 rounded">
-                            {videoScript.length} characters
+                            Powered by Tavus AI
                           </span>
                         </div>
-                        <p className="whitespace-pre-line leading-relaxed">{videoScript}</p>
+                        <p className="text-red-200 text-sm">
+                          {videoUrl.includes('tavus.video/') 
+                            ? "This video is hosted on Tavus platform and optimized for web viewing."
+                            : "Direct video file ready for playback."
+                          }
+                        </p>
                       </div>
                     )}
                   </div>

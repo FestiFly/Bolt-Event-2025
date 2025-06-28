@@ -28,7 +28,7 @@ SECRET_KEY = 'FetiFly'
 client = MongoClient('mongodb+srv://ihub:akash@ihub.fel24ru.mongodb.net/')
 db = client['festifly']
 festival_collection = db['festivals']
-
+users_collection = db['users']  # Add this line
 
 # -------------------------------------------------- Utilities -------------------------------------------------
 # Set up Reddit API client
@@ -1651,13 +1651,91 @@ def generate_tavus_video(request):
     if not doc_id:
         return JsonResponse({"error": "_id is required"}, status=400)
 
+    # Check authentication and subscription status
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return JsonResponse({"error": "Authentication required for video generation"}, status=401)
+    
+    token = auth_header.split(' ')[1]
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        user_id = payload.get("user_id")
+        
+        # Get user from database
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            return JsonResponse({"error": "User not found"}, status=404)
+        
+        # Check subscription expiry
+        user = check_subscription_expiry(user)
+        
+        # Get current usage counts
+        voice_usage = user.get('voice_usage', 0)
+        video_usage = user.get('video_usage', 0)
+        
+        # Check premium status
+        premium = user.get('premium', {})
+        plan = premium.get('plan') if premium.get('is_active', False) else None
+        
+        # Check video generation limits
+        if plan == 'yearly':
+            # Yearly plan: 6 video generations + unlimited voice
+            if video_usage >= 6:
+                return JsonResponse({
+                    "error": "You have reached the video generation limit for your yearly plan (6 videos)."
+                }, status=403)
+        elif plan == 'monthly':
+            # Monthly plan: 2 video generations + 5 voice generations
+            if video_usage >= 2:
+                return JsonResponse({
+                    "error": "You have reached the video generation limit for your monthly plan (2 videos). Upgrade to yearly for more videos."
+                }, status=403)
+        else:
+            # Free plan: 1 video generation + 2 voice generations
+            if video_usage >= 1:
+                return JsonResponse({
+                    "error": "You have reached the video generation limit for free users (1 video). Please upgrade to generate more videos."
+                }, status=403)
+        
+    except jwt.ExpiredSignatureError:
+        return JsonResponse({"error": "Token expired"}, status=401)
+    except (jwt.InvalidTokenError, Exception) as e:
+        return JsonResponse({"error": f"Invalid token: {str(e)}"}, status=401)
+
     doc = festival_collection.find_one({"_id": ObjectId(doc_id)})
 
-    # Check if video already exists
+    # Check if video already exists and is completed
     ai_video_data = doc.get("ai_video_data", {})
-    video_url = ai_video_data.get("en", {}).get("url")
-    if video_url:
-        return JsonResponse({"video_url": video_url})
+    existing_video = ai_video_data.get("en", {})
+    
+    # If we have an actual video_url (not placeholder), return it
+    if existing_video.get("video_url") and existing_video.get("status") == "completed":
+        return JsonResponse({"video_url": existing_video.get("video_url")})
+    
+    # If we only have placeholder URL, check with Tavus API
+    if existing_video.get("video_id") and existing_video.get("url"):
+        tavus_api_key = "703ba724213b46eca9a8eae6663dff22"
+        video_id = existing_video.get("video_id")
+        status_url = f"https://tavusapi.com/v2/videos/{video_id}"
+        headers = {"x-api-key": tavus_api_key}
+        
+        try:
+            response = requests.get(status_url, headers=headers)
+            if response.status_code == 200:
+                status_data = response.json()
+                if status_data.get("status") == "completed" and status_data.get("video_url"):
+                    # Update with actual video URL
+                    festival_collection.update_one(
+                        {"_id": ObjectId(doc_id)},
+                        {"$set": {
+                            "ai_video_data.en.video_url": status_data.get("video_url"),
+                            "ai_video_data.en.status": "completed"
+                        }}
+                    )
+                    return JsonResponse({"video_url": status_data.get("video_url")})
+        except Exception as e:
+            print(f"Error checking existing video: {e}")
     
     # Get script from ai_voice_data.en.script
     ai_voice_data = doc.get("ai_voice_data", {})
@@ -1668,7 +1746,7 @@ def generate_tavus_video(request):
     # Tavus API details
     tavus_api_key = "703ba724213b46eca9a8eae6663dff22"
     tavus_url = "https://tavusapi.com/v2/videos"
-    replica_id = data.get("replica_id", "rc2146c13e81")  # Default replica, can be customized
+    replica_id = data.get("replica_id", "rc2146c13e81")
     video_name = doc.get("title")
 
     payload = {
@@ -1686,71 +1764,167 @@ def generate_tavus_video(request):
     response = requests.post(tavus_url, json=payload, headers=headers)
     if response.status_code != 200:
         return JsonResponse({"error": "Failed to generate video", "details": response.text}, status=500)
+    
     result = response.json()
     video_id = result.get("video_id")
     if not video_id:
         return JsonResponse({"error": "Failed to get video_id from Tavus", "details": result}, status=500)
 
-    # Step 2: Poll for video status
+    # Increment video usage count after successful video generation request
+    users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$inc": {"video_usage": 1}}
+    )
+
+    # Step 2: Check immediate status
     status_url = f"https://tavusapi.com/v2/videos/{video_id}"
-    max_attempts = 70
-    video_data = None
-    for _ in range(max_attempts):
-        status_response = requests.get(status_url, headers=headers)
-        if status_response.status_code != 200:
-            time.sleep(5)
-            continue
+    status_response = requests.get(status_url, headers=headers)
+    
+    if status_response.status_code == 200:
         status_data = status_response.json()
         video_status = status_data.get("status")
-        if video_status == "completed":
-            video_data = status_data
-            break
-        elif video_status == "failed":
-            return JsonResponse({"error": "Video generation failed", "details": status_data}, status=500)
-        time.sleep(5)  # Wait before polling again
-
-    if not video_data or not video_data.get("video_url"):
-        # Store a placeholder Tavus URL in the DB for pending videos
-        placeholder_url = f"https://tavus.video/{video_id}"
-        festival_collection.update_one(
-            {"_id": ObjectId(doc_id)},
-            {"$set": {
-                "ai_video_data.en.url": placeholder_url,
-                "ai_video_data.en.status": status_data.get("status", "pending"),
-                "ai_video_data.en.video_id": video_id
-            }}
-        )
-        return JsonResponse({
-            "status": status_data.get("status", "pending"),
-            "message": "Video is still processing. Please try again later.",
-            "video_id": video_id
-        }, status=202)
         
-    # # Store the data key and video_url in ai_video_data.en
-    # festival_collection.update_one(
-    #     {"_id": ObjectId(doc_id)},
-    #     {"$set": {
-    #         "ai_video_data.en.data": video_data,
-    #         "ai_video_data.en.url": video_data.get("video_url")
-    #     }}
-    # )
-
-    return JsonResponse({
-        "video_url": video_data.get("video_url")
-    })
+        if video_status == "completed" and status_data.get("video_url"):
+            # Video is already completed - save actual URL
+            festival_collection.update_one(
+                {"_id": ObjectId(doc_id)},
+                {"$set": {
+                    "ai_video_data.en.video_url": status_data.get("video_url"),
+                    "ai_video_data.en.status": "completed",
+                    "ai_video_data.en.video_id": video_id,
+                    "ai_video_data.en.url": f"https://tavus.video/{video_id}"
+                }}
+            )
+            return JsonResponse({"video_url": status_data.get("video_url")})
+        else:
+            # Video is still processing - save placeholder
+            festival_collection.update_one(
+                {"_id": ObjectId(doc_id)},
+                {"$set": {
+                    "ai_video_data.en.url": f"https://tavus.video/{video_id}",
+                    "ai_video_data.en.status": video_status,
+                    "ai_video_data.en.video_id": video_id
+                }}
+            )
+            return JsonResponse({
+                "status": video_status,
+                "message": "Video is still processing. Please try again later.",
+                "video_id": video_id
+            }, status=202)
     
+    return JsonResponse({"error": "Failed to check video status"}, status=500)
 
-def fetch_dappier_data(query):
-    api_key = "ak_01jy34qz42ej5v1cayskwbxmy1"
-    endpoint = "https://api.dappier.com/app/datamodel/dm_01jysa2z8gergs66668z2010da"
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    body = {"query": query}
-    response = requests.post(endpoint, headers=headers, json=body)
-    return response.json()
-
+@csrf_exempt
+def get_tavus_video(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST request required."}, status=400)
+    
+    data = json.loads(request.body.decode("utf-8"))
+    doc_id = data.get("_id")
+    
+    if not doc_id:
+        return JsonResponse({"error": "_id is required"}, status=400)
+    
+    # Check authentication (optional for get, but good practice)
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get("user_id")
+        except:
+            pass  # Continue without user validation for get requests
+    
+    # Get video data from database
+    doc = festival_collection.find_one({"_id": ObjectId(doc_id)})
+    if not doc:
+        return JsonResponse({"error": "Festival not found"}, status=404)
+    
+    # Check if video exists in database
+    ai_video_data = doc.get("ai_video_data", {})
+    video_data = ai_video_data.get("en", {})
+    
+    # First check if we already have the actual download_url
+    if video_data.get("download_url"):
+        return JsonResponse({
+            "status": "completed",
+            "video_url": video_data.get("download_url"),
+            "player_url": video_data.get("url")
+        })
+    
+    # If we have a video_id, check with Tavus API for both player and download URLs
+    if video_data.get("video_id"):
+        tavus_api_key = "703ba724213b46eca9a8eae6663dff22"
+        video_id = video_data.get("video_id")
+        status_url = f"https://tavusapi.com/v2/videos/{video_id}"
+        headers = {"x-api-key": tavus_api_key}
+        
+        try:
+            response = requests.get(status_url, headers=headers)
+            if response.status_code == 200:
+                status_data = response.json()
+                video_status = status_data.get("status")
+                
+                if video_status == "completed":
+                    # Get both URLs
+                    hosted_url = status_data.get("hosted_url")
+                    download_url = status_data.get("download_url")
+                    
+                    # Update database with both URLs
+                    update_data = {
+                        "ai_video_data.en.status": "completed",
+                        "ai_video_data.en.url": hosted_url or f"https://tavus.video/{video_id}",
+                    }
+                    
+                    if download_url:
+                        update_data["ai_video_data.en.download_url"] = download_url
+                    
+                    festival_collection.update_one(
+                        {"_id": ObjectId(doc_id)},
+                        {"$set": update_data}
+                    )
+                    
+                    return JsonResponse({
+                        "status": "completed",
+                        "video_url": download_url or hosted_url or f"https://tavus.video/{video_id}",
+                        "player_url": hosted_url or f"https://tavus.video/{video_id}",
+                        "is_direct_file": bool(download_url)
+                    })
+                else:
+                    return JsonResponse({
+                        "status": video_status,
+                        "message": "Video is still processing"
+                    }, status=202)
+        except Exception as e:
+            return JsonResponse({"error": f"Error checking video status: {str(e)}"}, status=500)
+    
+    return JsonResponse({
+        "status": "not_found",
+        "message": "No video found for this festival"
+    }, status=404)
+def check_subscription_expiry(user):
+    """Check if user's premium subscription has expired and update accordingly"""
+    premium = user.get('premium', {})
+    
+    if premium.get('is_active', False) and premium.get('expires_at'):
+        expires_at = premium['expires_at']
+        
+        # Check if subscription has expired
+        if datetime.utcnow() > expires_at:
+            # Mark as expired
+            users_collection.update_one(
+                {"_id": user["_id"]},
+                {"$set": {
+                    "premium.is_active": False,
+                    "premium.expired": True
+                }}
+            )
+            
+            # Return updated user data
+            user['premium']['is_active'] = False
+            user['premium']['expired'] = True
+    
+    return user
 @csrf_exempt
 def ask_bot(request):
     if request.method == "POST":
