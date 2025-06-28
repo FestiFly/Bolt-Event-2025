@@ -230,7 +230,7 @@ const TripPlannerPage = () => {
     setVideoError(null);
 
     try {
-      const response = await fetch("http://localhost:8000/api/generate-ai-video/", {
+      const response = await fetch("http://localhost:8000/api/heygen-generate/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ _id: festival._id, language: voiceLang })
