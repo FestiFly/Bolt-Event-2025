@@ -1693,7 +1693,7 @@ def generate_tavus_video(request):
 
     # Step 2: Poll for video status
     status_url = f"https://tavusapi.com/v2/videos/{video_id}"
-    max_attempts = 40
+    max_attempts = 70
     video_data = None
     for _ in range(max_attempts):
         status_response = requests.get(status_url, headers=headers)
@@ -1738,6 +1738,7 @@ def generate_tavus_video(request):
     return JsonResponse({
         "video_url": video_data.get("video_url")
     })
+    
 
 def fetch_dappier_data(query):
     api_key = "ak_01jy34qz42ej5v1cayskwbxmy1"
