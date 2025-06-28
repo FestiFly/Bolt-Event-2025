@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Music, Calendar, Settings, Home, User, LogOut, ChevronDown, UserCircle, UserPlus } from 'lucide-react';
 import Cookies from 'js-cookie';
+import { useTranslation } from 'react-i18next';
 
 const Navigation = () => {
   const location = useLocation();
@@ -9,6 +10,7 @@ const Navigation = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
   
   const isActive = (path: string) => {
     if (path === '/organizer') {
@@ -16,6 +18,7 @@ const Navigation = () => {
     }
     return location.pathname === path;
   };
+
 
   // Decode JWT token to get user data
   const decodeJWT = (token: string) => {
@@ -157,7 +160,7 @@ const Navigation = () => {
             }}
           >
             <Home size={16} />
-            <span>Home</span>
+            <span>{t('home')}</span>
           </Link>
           
           <Link
@@ -176,7 +179,7 @@ const Navigation = () => {
             }}
           >
             <Calendar size={16} />
-            <span>Discover</span>
+            <span>{t('discover')}</span>
           </Link>
           
           {/* Organizer link - show for organizers or if on organizer pages */}
@@ -197,7 +200,7 @@ const Navigation = () => {
               }}
             >
               <Settings size={16} />
-              <span>Organizer</span>
+              <span>{t('organizer')}</span>
             </Link>
           )}
           
@@ -326,7 +329,7 @@ const Navigation = () => {
                         onClick={() => setIsDropdownOpen(false)}
                       >
                         <User size={16} />
-                        <span>View Profile</span>
+                        <span>{t('view_profile')}</span>
                       </Link>
                     )}
 
@@ -347,7 +350,7 @@ const Navigation = () => {
                           onClick={() => setIsDropdownOpen(false)}
                         >
                           <Settings size={16} />
-                          <span>Organizer Panel</span>
+                          <span>{t('organizer_panel')}</span>
                         </Link>
                         
                         <div style={{ height: "1px", backgroundColor: "rgba(255, 255, 255, 0.1)", margin: "0.25rem 0" }} />
@@ -369,7 +372,7 @@ const Navigation = () => {
                           }}
                         >
                           <LogOut size={16} />
-                          <span>Logout from Organizer</span>
+                          <span>{t('logout_organizer')}</span>
                         </button>
                       </>
                     )}
@@ -395,7 +398,7 @@ const Navigation = () => {
                           }}
                         >
                           <LogOut size={16} />
-                          <span>Logout</span>
+                          <span>{t('logout')}</span>
                         </button>
                       </>
                     )}
@@ -416,7 +419,7 @@ const Navigation = () => {
                       onClick={() => setIsDropdownOpen(false)}
                     >
                       <User size={16} />
-                      <span>Login</span>
+                      <span>{t('login')}</span>
                     </Link>
                     
                     <Link 
@@ -433,7 +436,7 @@ const Navigation = () => {
                       onClick={() => setIsDropdownOpen(false)}
                     >
                       <Settings size={16} />
-                      <span>Organizer Login</span>
+                      <span>{t('organizer_login')}</span>
                     </Link>
                   </>
                 )}
