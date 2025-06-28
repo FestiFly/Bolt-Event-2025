@@ -5,6 +5,12 @@ import Cookies from 'js-cookie';
 import axios from 'axios';
 import { Loader } from 'lucide-react';
 import AirHockeyGame from '../components/AirHockeyGame';
+import { Listbox } from '@headlessui/react';
+
+const months = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
 
 const OnboardingPage = () => {
   const navigate = useNavigate();
@@ -582,19 +588,35 @@ const OnboardingPage = () => {
                     <Calendar className="h-5 w-5 text-purple-400" />
                     <span>Which month are you planning for?</span>
                   </label>
-                  <select
+
+                  <Listbox
                     value={formData.startDate}
-                    onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
-                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    onChange={(value) =>
+                      setFormData((prev) => ({ ...prev, startDate: value }))
+                    }
                   >
-                    <option value="">Select a month</option>
-                    {[
-                      'January', 'February', 'March', 'April', 'May', 'June',
-                      'July', 'August', 'September', 'October', 'November', 'December'
-                    ].map(month => (
-                      <option key={month} value={month}>{month}</option>
-                    ))}
-                  </select>
+                    <div className="relative">
+                      <Listbox.Button className="w-full px-4 py-3 bg-white/10 border border-black rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        {formData.startDate || 'Select a month'}
+                      </Listbox.Button>
+
+                      {/* Dropdown opens upwards */}
+                      <Listbox.Options className="absolute bottom-full mb-2 w-full bg-gray-800 text-white rounded-lg shadow-lg z-10">
+                        {months.map((month) => (
+                          <Listbox.Option
+                            key={month}
+                            value={month}
+                            className={({ active, selected }) =>
+                              `cursor-pointer select-none px-4 py-2 rounded-lg ${active ? 'bg-purple-500 text-white' : 'text-white'
+                              } ${selected ? 'font-bold' : ''}`
+                            }
+                          >
+                            {month}
+                          </Listbox.Option>
+                        ))}
+                      </Listbox.Options>
+                    </div>
+                  </Listbox>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4">
