@@ -4,6 +4,7 @@ import { MapPin, Heart, Calendar, Search, Crown, Check } from 'lucide-react';
 import Cookies from 'js-cookie';
 import axios from 'axios';
 import { Loader } from 'lucide-react';
+import AirHockeyGame from '../components/AirHockeyGame';
 
 const OnboardingPage = () => {
   const navigate = useNavigate();
@@ -513,23 +514,8 @@ const OnboardingPage = () => {
             ))}
           </div>
 
-          <div className="relative w-full max-w-md h-[300px] mt-8 border border-white/20 rounded-xl overflow-hidden">
-
-            <div
-              onClick={handleDotClick}
-              style={{
-                position: 'absolute',
-                top: dotPosition.top,
-                left: dotPosition.left,
-                width: 30,
-                height: 30,
-                backgroundColor: getBallColor(),
-                borderRadius: '50%',
-                cursor: 'pointer',
-                transition: 'top 0.1s, left 0.1s',
-              }}
-              title="Click me!"
-            />
+          <div className="mt-8">
+            <AirHockeyGame />
           </div>
         </div>
       ) : (
