@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Mail, Edit2, Save, X, Camera, Loader, MapPin, Heart, Users, Copy, Check, AlertCircle, 
+import {
+  Mail, Edit2, Save, X, Camera, Loader, MapPin, Heart, Users, Copy, Check, AlertCircle,
   Crown, User, Settings, Calendar, Shield, Star, Gift, TrendingUp, Award, Clock,
   CreditCard, Sparkles, UserPlus, ExternalLink, Bell, Globe, Volume2, Smartphone,
   Monitor, Moon, Sun
@@ -32,7 +32,7 @@ const checkPremiumStatus = (user: any) => {
   }
 
   const premium = user.premium;
-  
+
   return {
     isActive: premium.is_active || false,
     isPro: premium.is_pro || false,
@@ -49,7 +49,7 @@ const checkPremiumStatus = (user: any) => {
 
 const formatDateTime = (dateString: string | null): string => {
   if (!dateString) return 'N/A';
-  
+
   try {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-IN', {
@@ -69,7 +69,7 @@ const formatDateTime = (dateString: string | null): string => {
 
 const formatDateOnly = (dateString: string | null): string => {
   if (!dateString) return 'N/A';
-  
+
   try {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-IN', {
@@ -138,7 +138,7 @@ const ProfilePage = () => {
   const [referralCode, setReferralCode] = useState('');
   const [copySuccess, setCopySuccess] = useState(false);
   const [userLoading, setUserLoading] = useState(true);
-  
+
   // Preferences state
   const [preferences, setPreferences] = useState({
     notifications: {
@@ -158,7 +158,7 @@ const ProfilePage = () => {
       timezone: 'Asia/Kolkata'
     }
   });
-  
+
   const interestOptions = [
     'Music', 'Food', 'Art', 'Technology', 'Culture', 'Comedy',
     'Film', 'Literature', 'Sports', 'Gaming', 'Wellness', 'Dance'
@@ -172,7 +172,7 @@ const ProfilePage = () => {
       navigate('/auth');
       return;
     }
-    
+
     fetchUserProfile();
     fetchSubscriptionStatus();
   }, [navigate]);
@@ -185,15 +185,15 @@ const ProfilePage = () => {
         navigate('/auth');
         return;
       }
-      
+
       const response = await axios.get('http://localhost:8000/api/user/profile/', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (response.data) {
         const userData = response.data;
         setUser(userData);
-        
+
         setFormData({
           name: userData.name || '',
           email: userData.email || '',
@@ -201,7 +201,7 @@ const ProfilePage = () => {
           location: userData.location || '',
           preferences: userData.preferences || []
         });
-        
+
         setReferralCode(userData.referralCode || '');
         calculateProfileCompletion(userData);
       }
@@ -220,11 +220,11 @@ const ProfilePage = () => {
     try {
       const token = getAuthToken();
       if (!token) return;
-      
+
       const response = await axios.get('http://localhost:8000/api/subscription/status/', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (response.data) {
         setSubscriptionStatus(response.data);
       }
@@ -236,13 +236,13 @@ const ProfilePage = () => {
   const calculateProfileCompletion = (userData: any) => {
     let completionScore = 0;
     let totalFields = 5;
-    
+
     if (userData.name) completionScore += 1;
     if (userData.bio) completionScore += 1;
     if (userData.location) completionScore += 1;
     if (userData.preferences && userData.preferences.length > 0) completionScore += 1;
     if (userData.profilePicture) completionScore += 1;
-    
+
     setProfileCompletion(Math.round((completionScore / totalFields) * 100));
   };
 
@@ -273,10 +273,10 @@ const ProfilePage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
+
     try {
       const token = getAuthToken();
-      
+
       const response = await axios.post('http://localhost:8000/api/user/update-profile/', {
         name: formData.name,
         bio: formData.bio,
@@ -285,7 +285,7 @@ const ProfilePage = () => {
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (response.data && response.data.user) {
         setUser(response.data.user);
         setIsEditing(false);
@@ -332,7 +332,7 @@ const ProfilePage = () => {
           <AlertCircle className="h-16 w-16 text-red-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-2">{t('unable_to_load')}</h2>
           <p className="text-gray-300 mb-6">{t('refresh_login')}</p>
-          <button 
+          <button
             onClick={() => navigate('/auth')}
             className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
           >
@@ -351,18 +351,18 @@ const ProfilePage = () => {
           <User className="h-5 w-5 text-purple-400" />
           {t('personal_info')}
         </h3>
-        
+
         <div className="grid md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">{t('full_name')}</label>
             <p className="text-white text-lg">{user.name || t('not_set')}</p>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">{t('username')}</label>
             <p className="text-white text-lg">@{user.username}</p>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">{t('email')}</label>
             <p className="text-white text-lg flex items-center gap-2">
@@ -370,7 +370,7 @@ const ProfilePage = () => {
               {user.email}
             </p>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">{t('location')}</label>
             <p className="text-white text-lg flex items-center gap-2">
@@ -379,7 +379,7 @@ const ProfilePage = () => {
             </p>
           </div>
         </div>
-        
+
         {user.bio && (
           <div className="mt-6">
             <label className="block text-sm font-medium text-gray-300 mb-2">{t('bio')}</label>
@@ -394,7 +394,7 @@ const ProfilePage = () => {
           <Heart className="h-5 w-5 text-purple-400" />
           {t('interests')} ({user.preferences?.length || 0})
         </h3>
-        
+
         {user.preferences && user.preferences.length > 0 ? (
           <div className="flex flex-wrap gap-3">
             {user.preferences.map((preference: string) => (
@@ -417,18 +417,18 @@ const ProfilePage = () => {
           <TrendingUp className="h-5 w-5 text-purple-400" />
           {t('account_stats')}
         </h3>
-        
+
         <div className="grid md:grid-cols-3 gap-6">
           <div className="text-center">
             <div className="text-3xl font-bold text-purple-400 mb-2">{profileCompletion}%</div>
             <p className="text-gray-300 text-sm">{t('profile_complete')}</p>
           </div>
-          
+
           <div className="text-center">
             <div className="text-3xl font-bold text-green-400 mb-2">{user.referrals?.length || 0}</div>
             <p className="text-gray-300 text-sm">{t('successful_referrals')}</p>
           </div>
-          
+
           <div className="text-center">
             <div className="text-3xl font-bold text-blue-400 mb-2">
               {user.created_at ? Math.floor((Date.now() - new Date(user.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0}
@@ -448,7 +448,7 @@ const ProfilePage = () => {
             <UserPlus className="h-5 w-5 text-green-400" />
             {t('referred_by')}
           </h3>
-          
+
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center">
               <span className="text-green-400 font-bold text-lg">
@@ -466,7 +466,7 @@ const ProfilePage = () => {
       )}
     </div>
   );
-  
+
   const renderProfileForm = () => (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid md:grid-cols-2 gap-6">
@@ -484,7 +484,7 @@ const ProfilePage = () => {
             placeholder={t('full_name')}
           />
         </div>
-        
+
         <div>
           <label className="block text-white font-medium mb-2 flex items-center gap-2">
             <Mail className="h-4 w-4 text-purple-400" />
@@ -501,7 +501,7 @@ const ProfilePage = () => {
           />
         </div>
       </div>
-      
+
       <div>
         <label className="block text-white font-medium mb-2 flex items-center gap-2">
           <MapPin className="h-4 w-4 text-purple-400" />
@@ -516,7 +516,7 @@ const ProfilePage = () => {
           placeholder={t('location')}
         />
       </div>
-      
+
       <div>
         <label className="block text-white font-medium mb-2 flex items-center gap-2">
           <Heart className="h-4 w-4 text-purple-400" />
@@ -531,7 +531,7 @@ const ProfilePage = () => {
           placeholder={t('bio')}
         />
       </div>
-      
+
       <div>
         <label className="block text-white font-medium mb-3 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-purple-400" />
@@ -543,18 +543,17 @@ const ProfilePage = () => {
               key={interest}
               type="button"
               onClick={() => handlePreferenceToggle(interest)}
-              className={`px-4 py-2 rounded-lg border transition-all text-sm font-medium ${
-                formData.preferences.includes(interest)
+              className={`px-4 py-2 rounded-lg border transition-all text-sm font-medium ${formData.preferences.includes(interest)
                   ? 'bg-purple-600/30 text-purple-200 border-purple-400/50 shadow-lg'
                   : 'bg-white/10 text-gray-300 border-white/20 hover:bg-white/20'
-              }`}
+                }`}
             >
               {interest}
             </button>
           ))}
         </div>
       </div>
-      
+
       <div className="flex gap-4 justify-end pt-6 border-t border-white/10">
         <button
           type="button"
@@ -579,7 +578,7 @@ const ProfilePage = () => {
       </div>
     </form>
   );
-  
+
   const renderPreferencesTab = () => (
     <div className="space-y-8">
       {/* Notification Preferences */}
@@ -588,7 +587,7 @@ const ProfilePage = () => {
           <Bell className="h-5 w-5 text-purple-400" />
           {t('notification_preferences')}
         </h3>
-        
+
         <div className="space-y-4">
           <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
             <div className="flex items-center gap-3">
@@ -608,7 +607,7 @@ const ProfilePage = () => {
               <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
             </label>
           </div>
-          
+
           <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
             <div className="flex items-center gap-3">
               <Smartphone className="h-5 w-5 text-green-400" />
@@ -627,7 +626,7 @@ const ProfilePage = () => {
               <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
             </label>
           </div>
-          
+
           <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
             <div className="flex items-center gap-3">
               <Volume2 className="h-5 w-5 text-yellow-400" />
@@ -655,7 +654,7 @@ const ProfilePage = () => {
           <Shield className="h-5 w-5 text-purple-400" />
           {t('privacy_settings')}
         </h3>
-        
+
         <div className="space-y-4">
           <div className="p-4 bg-white/5 rounded-lg">
             <label className="block text-white font-medium mb-2">{t('profile_visibility')}</label>
@@ -669,7 +668,7 @@ const ProfilePage = () => {
               <option value="private" className="bg-gray-800">{t('private_profile')}</option>
             </select>
           </div>
-          
+
           <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
             <div>
               <p className="text-white font-medium">{t('show_location')}</p>
@@ -685,7 +684,7 @@ const ProfilePage = () => {
               <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
             </label>
           </div>
-          
+
           <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
             <div>
               <p className="text-white font-medium">{t('show_interests')}</p>
@@ -710,10 +709,10 @@ const ProfilePage = () => {
           <Monitor className="h-5 w-5 text-purple-400" />
           {t('display_settings')}
         </h3>
-        
+
         <div className="space-y-4">
           <div className="p-4 bg-white/5 rounded-lg">
-            <label className="block text-white font-medium mb-2 flex items-center gap-2">
+            <label className="text-white font-medium mb-2 flex items-center gap-2">
               {preferences.display.theme === 'dark' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
               {t('theme_preference')}
             </label>
@@ -727,9 +726,9 @@ const ProfilePage = () => {
               <option value="auto" className="bg-gray-800">{t('auto_system')}</option>
             </select>
           </div>
-          
+
           <div className="p-4 bg-white/5 rounded-lg">
-            <label className="block text-white font-medium mb-2 flex items-center gap-2">
+            <label className="text-white font-medium mb-2 flex items-center gap-2">
               <Globe className="h-4 w-4" />
               {t('language')}
             </label>
@@ -745,9 +744,9 @@ const ProfilePage = () => {
               <option value="kn" className="bg-gray-800">ಕನ್ನಡ (Kannada)</option>
             </select>
           </div>
-          
+
           <div className="p-4 bg-white/5 rounded-lg">
-            <label className="block text-white font-medium mb-2 flex items-center gap-2">
+            <label className="text-white font-medium mb-2 flex items-center gap-2">
               <Clock className="h-4 w-4" />
               {t('timezone')}
             </label>
@@ -781,7 +780,7 @@ const ProfilePage = () => {
       </div>
     </div>
   );
-  
+
   const renderReferralsTab = () => (
     <div className="space-y-8">
       {/* Referral Code Section */}
@@ -793,24 +792,23 @@ const ProfilePage = () => {
         <p className="text-gray-300 text-sm mb-4">
           {t('share_code_friends')}
         </p>
-        
+
         <div className="flex items-center gap-3 p-4 bg-white/10 rounded-lg border border-white/20">
           <code className="flex-1 text-purple-300 font-mono text-lg font-bold tracking-wider">
             {referralCode}
           </code>
           <button
             onClick={copyReferralCode}
-            className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
-              copySuccess 
-                ? 'bg-green-600/20 text-green-300 border border-green-400/30' 
+            className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${copySuccess
+                ? 'bg-green-600/20 text-green-300 border border-green-400/30'
                 : 'bg-purple-600/20 text-purple-300 border border-purple-400/30 hover:bg-purple-600/30'
-            }`}
+              }`}
           >
             {copySuccess ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             {copySuccess ? t('copied') : t('copy')}
           </button>
         </div>
-        
+
         {copySuccess && (
           <p className="text-green-400 text-sm mt-2 flex items-center gap-1">
             <Check className="h-3 w-3" />
@@ -825,7 +823,7 @@ const ProfilePage = () => {
           <div className="text-3xl font-bold text-green-400 mb-2">{user.referrals?.length || 0}</div>
           <p className="text-gray-300">{t('successful_referrals')}</p>
         </div>
-        
+
         <div className="bg-white/5 rounded-xl p-6 border border-white/10 text-center">
           <div className="text-3xl font-bold text-purple-400 mb-2">₹{(user.referrals?.length || 0) * 50}</div>
           <p className="text-gray-300">{t('rewards_earned')}</p>
@@ -839,7 +837,7 @@ const ProfilePage = () => {
             <Users className="h-5 w-5 text-purple-400" />
             {t('referral_history')} ({user.referrals.length})
           </h3>
-          
+
           <div className="space-y-4">
             {user.referrals.map((referral: any, index: number) => (
               <div
@@ -905,7 +903,7 @@ const ProfilePage = () => {
         </div>
       );
     }
-    
+
     return (
       <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-xl p-6 border border-yellow-400/20">
         <div className="flex items-start justify-between mb-4">
@@ -927,7 +925,7 @@ const ProfilePage = () => {
               </p>
             </div>
           </div>
-          
+
           <div className="text-right">
             <div className="text-yellow-400 font-bold text-lg">
               ₹{premiumStatus.amount}
@@ -935,7 +933,7 @@ const ProfilePage = () => {
             <div className="text-gray-400 text-xs">{premiumStatus.currency}</div>
           </div>
         </div>
-        
+
         <div className="grid md:grid-cols-2 gap-4 mb-4">
           <div className="bg-white/5 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -944,7 +942,7 @@ const ProfilePage = () => {
             </div>
             <p className="text-white font-medium">{formatDateOnly(premiumStatus.startedAt)}</p>
           </div>
-          
+
           <div className="bg-white/5 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="h-4 w-4 text-purple-400" />
@@ -953,7 +951,7 @@ const ProfilePage = () => {
             <p className="text-white font-medium">{formatDateOnly(premiumStatus.expiresAt)}</p>
           </div>
         </div>
-        
+
         <div className="bg-white/5 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -972,7 +970,7 @@ const ProfilePage = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="mt-4 pt-4 border-t border-white/10">
           <button
             onClick={() => navigate('/?openPremium=true')}
@@ -987,7 +985,11 @@ const ProfilePage = () => {
   };
 
   return (
-    <div className="min-h-screen py-8 px-4 bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900">
+    <div className="min-h-screen py-8 px-4"
+      style={{
+        backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))",
+        backgroundAttachment: "fixed"
+      }}>
       <div className="max-w-6xl mx-auto">
         {/* Profile Header */}
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-8 border border-white/20">
@@ -1001,7 +1003,7 @@ const ProfilePage = () => {
                   <Camera className="h-3 w-3 text-white" />
                 </button>
               </div>
-              
+
               <div>
                 <h1 className="text-3xl font-bold text-white mb-1">
                   {user.name || user.username}
@@ -1010,13 +1012,13 @@ const ProfilePage = () => {
                   <Mail className="h-4 w-4" />
                   {user.email}
                 </p>
-                
+
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-2 bg-purple-600/20 text-purple-200 px-3 py-1 rounded-full border border-purple-400/30">
                     <TrendingUp className="h-3 w-3" />
                     <span className="text-sm font-medium">{profileCompletion}% {t('complete')}</span>
                   </div>
-                  
+
                   {premiumStatus.isActive && (
                     <div className="flex items-center gap-2 bg-yellow-500/20 text-yellow-300 px-3 py-1 rounded-full border border-yellow-400/30">
                       <Crown className="h-3 w-3" />
@@ -1025,7 +1027,7 @@ const ProfilePage = () => {
                       </span>
                     </div>
                   )}
-                  
+
                   <div className="flex items-center gap-2 bg-blue-600/20 text-blue-200 px-3 py-1 rounded-full border border-blue-400/30">
                     <Calendar className="h-3 w-3" />
                     <span className="text-sm">
@@ -1035,20 +1037,19 @@ const ProfilePage = () => {
                 </div>
               </div>
             </div>
-            
+
             <button
               onClick={() => setIsEditing(!isEditing)}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all shadow-lg ${
-                isEditing 
-                  ? 'bg-red-600/20 text-red-200 border border-red-400/30 hover:bg-red-600/30' 
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all shadow-lg ${isEditing
+                  ? 'bg-red-600/20 text-red-200 border border-red-400/30 hover:bg-red-600/30'
                   : 'bg-purple-600/20 text-purple-200 border border-purple-400/30 hover:bg-purple-600/30'
-              }`}
+                }`}
             >
               {isEditing ? <X className="h-4 w-4" /> : <Edit2 className="h-4 w-4" />}
               {isEditing ? t('cancel_edit') : t('edit_profile')}
             </button>
           </div>
-          
+
           {/* Progress Bar */}
           <div className="mt-6">
             <div className="flex items-center justify-between mb-2">
@@ -1056,7 +1057,7 @@ const ProfilePage = () => {
               <span className="text-sm text-purple-300 font-medium">{profileCompletion}%</span>
             </div>
             <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
-              <div 
+              <div
                 className="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-500 ease-out"
                 style={{ width: `${profileCompletion}%` }}
               />
@@ -1075,18 +1076,17 @@ const ProfilePage = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 font-medium transition-all ${
-                  activeTab === tab.id
+                className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 font-medium transition-all ${activeTab === tab.id
                     ? 'bg-purple-600/20 text-purple-200 border-b-2 border-purple-400'
                     : 'text-gray-300 hover:text-white hover:bg-white/5'
-                }`}
+                  }`}
               >
                 <tab.icon className="h-4 w-4" />
                 {tab.label}
               </button>
             ))}
           </div>
-          
+
           <div className="p-8">
             {activeTab === 'profile' && (isEditing ? renderProfileForm() : renderProfileTab())}
             {activeTab === 'preferences' && renderPreferencesTab()}
