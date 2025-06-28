@@ -12,6 +12,7 @@ import TwitterIcon from '../assets/share/x.png';
 import InstagramIcon from '../assets/share/Instagram.svg';
 
 interface FestivalDetail {
+  url: string | undefined;
   _id: string;
   title: string;
   location: string;
@@ -154,7 +155,8 @@ const TripPlannerPage = () => {
           month: "October",
           vibe_score: 0.06,
           content: "Hi all! I'm the owner of Astronox, a music and arts festival taking place Oct 17-21 at Valkyrie Ranch in Paige, TX. I've decided to share my budget publicly because I think this is very important to help the community understand just what it takes to make these things possible. Please let me know if you have any questions and I'll be happy to answer them! Hopefully this helps people understand what it takes to make these events possible. Astronox.net",
-          fetched_at: "2025-06-17T06:12:16.835"
+          fetched_at: "2025-06-17T06:12:16.835",
+          url: undefined
         };
         setFestival(mockFestival);
         setError(null);
@@ -817,7 +819,7 @@ const TripPlannerPage = () => {
                 <span>Voice Assistant</span>
               </button>
               <a
-                href={festival.reddit_url}
+                href={festival.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
