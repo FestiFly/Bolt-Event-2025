@@ -221,7 +221,7 @@ const TripPlannerPage = () => {
     setVideoUrl(null);
     setVideoError(null);
     try {
-      const response = await fetch("http://localhost:8000/api/heygen-generate/", {
+      const response = await fetch("http://localhost:8000/api/tavus-generate/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ _id: festival._id, language: voiceLang })
