@@ -1663,7 +1663,7 @@ def generate_heygen_video(request):
     ai_voice_data = doc.get("ai_voice_data", {})
     script = ai_voice_data.get("en", {}).get("script")
     if not doc or not script:
-        return JsonResponse({"error": "Document or ai_voice_data.en.script not found"}, status=404)
+        return JsonResponse({"error": "Explore the voice model before video generation"}, status=404)
     
     avatar_id = data.get("avatar_id", "Adriana_Business_Front_public")
     voice_id = data.get("voice_id", "9af7667dcc3145b790a5fb1ac226dfe3")
