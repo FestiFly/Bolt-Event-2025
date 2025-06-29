@@ -53,6 +53,7 @@ const OnboardingPage = () => {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [dotPosition, setDotPosition] = useState({ top: '50%', left: '50%' });
+  const [scrollLocked, setScrollLocked] = useState(false);
 
   useEffect(() => {
     if (!loading) return;
@@ -165,8 +166,22 @@ const OnboardingPage = () => {
     }));
   };
 
+  useEffect(() => {
+    if (scrollLocked) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+
+    // Cleanup function to reset the overflow when the component unmounts
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [scrollLocked]);
+
   const handleFindFestivals = async () => {
-    setLoading(true); // Set loading to true when starting the data fetching
+    setLoading(true);
+    setScrollLocked(true); // Lock scroll when loading starts
     const payload = {
       location: formData.location,
       interests: formData.interests.map(i => i.toLowerCase()),
@@ -190,7 +205,8 @@ const OnboardingPage = () => {
       console.error('Error connecting to backend:', error);
       alert('Failed to fetch recommendations.');
     } finally {
-      setLoading(false); // Set loading to false once the data fetching is complete
+      setLoading(false);
+      setScrollLocked(false); // Unlock scroll when loading ends
     }
   };
 
@@ -422,13 +438,13 @@ const OnboardingPage = () => {
 
   const getPlanCardStyle = (plan: "monthly" | "yearly") => {
     if (isPlanActive(plan)) {
-      return "flex-1 rounded-xl p-6 border bg-green-500/20 border-green-500/50";
+      return "flex-1 rounded-xl p-4 sm:p-6 border bg-green-500/20 border-green-500/50";
     }
 
     if (plan === "monthly") {
-      return "flex-1 bg-white/5 rounded-xl p-6 border border-white/10 hover:border-purple-500/50 transition-all hover:bg-white/10 hover:scale-[1.02]";
+      return "flex-1 bg-white/5 rounded-xl p-4 sm:p-6 border border-white/10 hover:border-purple-500/50 transition-all hover:bg-white/10 hover:scale-[1.02]";
     } else {
-      return "flex-1 bg-gradient-to-b from-yellow-500/20 to-transparent rounded-xl p-6 border border-yellow-500/30 relative hover:border-yellow-400/70 transition-all hover:scale-[1.02] hover:from-yellow-500/30";
+      return "flex-1 bg-gradient-to-b from-yellow-500/20 to-transparent rounded-xl p-4 sm:p-6 border border-yellow-500/30 relative hover:border-yellow-400/70 transition-all hover:scale-[1.02] hover:from-yellow-500/30";
     }
   };
 
@@ -487,93 +503,68 @@ const OnboardingPage = () => {
       {loading ? (
         <div className="min-h-screen flex flex-col items-center justify-center px-4 text-center"
           style={{
-            background: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
-          }}>
-          <Loader className="h-12 w-12 text-purple-400 animate-spin mb-6" />
-          <p className="text-white text-xl animate-pulse">
+            background: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))",
+            overflow: 'hidden'
+          }}
+        ><Loader className="h-8 w-8 sm:h-12 sm:w-12 text-purple-400 animate-spin mb-4 sm:mb-6" />
+        <p className="text-white text-lg sm:text-xl animate-pulse px-2">
             {loaderMessages[currentMessageIndex]}
           </p>
-          <div className="mt-6 text-center space-y-2">
-            <p className="text-lg font-semibold text-purple-300 animate-bounce">
-              Your festival lineup is loading... meanwhile, flex those fingers!
-            </p>
-            <p className="text-white text-sm bg-white/10 border border-purple-500/30 px-4 py-2 rounded-full inline-block shadow-md">
-              🎯 Score: <span className={`font-bold ${getScoreColor()}`}>{score}</span>
-            </p>
-          </div>
-          <div className="mt-4 text-sm text-gray-300">
-            Current Level:{" "}
-            <span className={`font-semibold ${getScoreColor()}`}>
-              {getCurrentLevel()}
-            </span>
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs text-white/80">
-            {scoreMilestones.map((milestone, index) => (
-              <div
-                key={index}
-                className={`px-3 py-1 rounded-full border border-white/10 text-center ${score >= milestone.minScore ? milestone.color : "text-gray-500"
-                  } bg-white/5`}
-              >
-                {milestone.label} ({milestone.minScore}+)
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8">
+          {/* Loading content */}
+          <div className="mt-6 sm:mt-8 w-full max-w-6xl px-2">
             <AirHockeyGame />
           </div>
         </div>
       ) : (
-        <div style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "3rem 1rem",
-          backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))",
-          backgroundAttachment: "fixed"
-        }}>
-          <div className="max-w-2xl mx-auto w-full">
-            <div className="text-center mb-12">
-              <h1 className="text-5xl font-bold text-white mb-4">
+        <div className="min-h-screen py-6 sm:py-12 px-4"
+          style={{
+            backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))",
+            backgroundAttachment: "fixed"
+          }}>
+          <div className="max-w-4xl mx-auto w-full">
+            {/* Header Section */}
+            <div className="text-center mb-8 sm:mb-12">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 px-2">
                 Discover Your Next
                 <span className="block text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">
                   Festival Adventure
                 </span>
               </h1>
-              <p className="text-xl text-gray-300">
+              <p className="text-lg sm:text-xl text-gray-300 px-2">
                 AI-powered festival discovery tailored just for you
               </p>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 shadow-2xl border border-white/20">
-              <div className="space-y-8">
+            {/* Main Form Card */}
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl border border-white/20 mx-2 sm:mx-0">
+              <div className="space-y-6 sm:space-y-8">
+                {/* Location Input */}
                 <div>
-                  <label className="flex items-center space-x-2 text-white font-semibold mb-4">
-                    <MapPin className="h-5 w-5 text-purple-400" />
-                    <span>Where are you located?</span>
+                  <label className="flex items-center space-x-2 text-white font-semibold mb-3 sm:mb-4">
+                    <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400" />
+                    <span className="text-sm sm:text-base">Where are you located?</span>
                   </label>
                   <input
                     type="text"
                     placeholder="Enter your city or zip code"
                     value={formData.location}
                     onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-3 sm:px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm sm:text-base"
                   />
                 </div>
 
+                {/* Interests Selection */}
                 <div>
-                  <label className="flex items-center space-x-2 text-white font-semibold mb-4">
-                    <Heart className="h-5 w-5 text-purple-400" />
-                    <span>What interests you?</span>
+                  <label className="flex items-center space-x-2 text-white font-semibold mb-3 sm:mb-4">
+                    <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400" />
+                    <span className="text-sm sm:text-base">What interests you?</span>
                   </label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
                     {interestOptions.map((interest) => (
                       <button
                         key={interest}
                         onClick={() => handleInterestToggle(interest)}
-                        className={`px-4 py-2 rounded-lg transition-all ${formData.interests.includes(interest)
+                        className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-sm sm:text-base ${formData.interests.includes(interest)
                           ? 'bg-purple-600 text-white shadow-lg scale-105'
                           : 'bg-white/10 text-gray-300 hover:bg-white/20 border border-white/20'
                           }`}
@@ -584,10 +575,11 @@ const OnboardingPage = () => {
                   </div>
                 </div>
 
+                {/* Month Selection */}
                 <div>
-                  <label className="flex items-center space-x-2 text-white font-semibold mb-4">
-                    <Calendar className="h-5 w-5 text-purple-400" />
-                    <span>Which month are you planning for?</span>
+                  <label className="flex items-center space-x-2 text-white font-semibold mb-3 sm:mb-4">
+                    <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400" />
+                    <span className="text-sm sm:text-base">Which month are you planning for?</span>
                   </label>
 
                   <Listbox
@@ -597,18 +589,18 @@ const OnboardingPage = () => {
                     }
                   >
                     <div className="relative">
-                      <Listbox.Button className="w-full px-4 py-3 bg-white/10 border border-black rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                      <Listbox.Button className="w-full px-3 sm:px-4 py-3 bg-white/10 border border-black rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm sm:text-base text-left">
                         {formData.startDate || 'Select a month'}
                       </Listbox.Button>
 
                       {/* Dropdown opens upwards */}
-                      <Listbox.Options className="absolute bottom-full mb-2 w-full bg-gray-800 text-white rounded-lg shadow-lg z-10">
+                      <Listbox.Options className="absolute bottom-full mb-2 w-full bg-gray-800 text-white rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
                         {months.map((month) => (
                           <Listbox.Option
                             key={month}
                             value={month}
                             className={({ active, selected }) =>
-                              `cursor-pointer select-none px-4 py-2 rounded-lg ${active ? 'bg-purple-500 text-white' : 'text-white'
+                              `cursor-pointer select-none px-3 sm:px-4 py-2 text-sm sm:text-base ${active ? 'bg-purple-500 text-white' : 'text-white'
                               } ${selected ? 'font-bold' : ''}`
                             }
                           >
@@ -620,39 +612,44 @@ const OnboardingPage = () => {
                   </Listbox>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-4">
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   <button
                     onClick={handleFindFestivals}
                     disabled={!formData.location || formData.interests.length === 0}
-                    className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-lg font-semibold flex items-center justify-center space-x-2 hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
+                    className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold flex items-center justify-center space-x-2 hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl text-sm sm:text-base"
                   >
-                    <Search className="h-5 w-5" />
+                    <Search className="h-4 w-4 sm:h-5 sm:w-5" />
                     <span>Find Festivals</span>
                   </button>
 
                   <button
                     onClick={handlePremiumClick}
-                    className="flex items-center justify-center space-x-2 px-6 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-black rounded-lg font-semibold hover:from-yellow-600 hover:to-orange-600 transition-all shadow-lg hover:shadow-xl"
+                    className="flex items-center justify-center space-x-2 px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-black rounded-lg font-semibold hover:from-yellow-600 hover:to-orange-600 transition-all shadow-lg hover:shadow-xl text-sm sm:text-base whitespace-nowrap"
                   >
-                    <Crown className="h-5 w-5" />
-                    <span>{isAuthenticated() ? 'Premium Plan' : 'Login for Premium'}</span>
+                    <Crown className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="hidden sm:inline">{isAuthenticated() ? 'Premium Plan' : 'Login for Premium'}</span>
+                    <span className="sm:hidden">Premium</span>
                   </button>
                 </div>
               </div>
             </div>
 
+            {/* Premium Modal */}
             {showPremium && (
-              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-4xl w-full border border-white/20">
-                  <div className="text-center mb-6">
-                    <Crown className="h-16 w-16 text-yellow-400 mx-auto mb-4" />
-                    <h3 className="text-2xl font-bold text-white mb-2">Upgrade Your Festival Experience</h3>
-                    <p className="text-gray-300">Choose the plan that fits your festival lifestyle</p>
+              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50">
+                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 sm:p-6 lg:p-8 max-w-6xl w-full border border-white/20 max-h-[95vh] overflow-y-auto">
+                  {/* Modal Header */}
+                  <div className="text-center mb-4 sm:mb-6">
+                    <Crown className="h-12 w-12 sm:h-16 sm:w-16 text-yellow-400 mx-auto mb-3 sm:mb-4" />
+                    <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">Upgrade Your Festival Experience</h3>
+                    <p className="text-gray-300 text-sm sm:text-base px-2">Choose the plan that fits your festival lifestyle</p>
 
+                    {/* Current Subscription Status */}
                     {userPremiumStatus?.is_active && (
-                      <div className="inline-flex items-center gap-2 bg-green-500/20 border border-green-500/30 rounded-lg px-4 py-2 mt-4">
+                      <div className="inline-flex items-center gap-2 bg-green-500/20 border border-green-500/30 rounded-lg px-3 sm:px-4 py-2 mt-3 sm:mt-4">
                         <Check size={16} className="text-green-400" />
-                        <span className="text-green-300 text-sm">
+                        <span className="text-green-300 text-xs sm:text-sm">
                           Currently subscribed to {userPremiumStatus.plan} plan
                           {userPremiumStatus.expires_at && (
                             <>
@@ -667,57 +664,39 @@ const OnboardingPage = () => {
                     )}
                   </div>
 
-                  <div className="flex flex-col md:flex-row gap-6">
+                  {/* Pricing Plans */}
+                  <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+                    {/* Monthly Plan */}
                     <div className={getPlanCardStyle("monthly")}>
-                      <div className="text-center mb-4">
+                      <div className="text-center mb-3 sm:mb-4">
                         <div className="flex items-center justify-center gap-2 mb-2">
-                          <h4 className="text-xl font-bold text-white">Monthly Plan</h4>
+                          <h4 className="text-lg sm:text-xl font-bold text-white">Monthly Plan</h4>
                           {isPlanActive('monthly') && <Check size={20} className="text-green-400" />}
                         </div>
-                        <div className="inline-flex items-center gap-1 mb-4">
-                          <span className="text-3xl font-bold text-white">₹49</span>
-                          <span className="text-gray-400">/month</span>
+                        <div className="inline-flex items-center gap-1 mb-3 sm:mb-4">
+                          <span className="text-2xl sm:text-3xl font-bold text-white">₹49</span>
+                          <span className="text-gray-400 text-sm sm:text-base">/month</span>
                         </div>
-                        <div className="h-[1px] w-full bg-white/20 my-4"></div>
+                        <div className="h-[1px] w-full bg-white/20 my-3 sm:my-4"></div>
                       </div>
 
-                      <ul className="space-y-3 mb-6">
-                        <li className="flex items-start gap-2 text-gray-200">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span>Unlimited festival searches across India</span>
-                        </li>
-                        <li className="flex items-start gap-2 text-gray-200">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span>Basic AI-powered recommendations</span>
-                        </li>
-                        <li className="flex items-start gap-2 text-gray-200">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span>Limited voice assistant (30 mins/month)</span>
-                        </li>
-                        <li className="flex items-start gap-2 text-gray-200">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span>Includes 2 AI-powered video generations</span>
-                        </li>
-                        <li className="flex items-start gap-2 text-gray-200">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span>Basic calendar integration</span>
-                        </li>
-                        <li className="flex items-start gap-2 text-gray-200">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span>Standard trip planning tools</span>
-                        </li>
+                      {/* Features List */}
+                      <ul className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
+                        {[
+                          "Unlimited festival searches across India",
+                          "Basic AI-powered recommendations",
+                          "Limited voice assistant (30 mins/month)",
+                          "Includes 2 AI-powered video generations",
+                          "Basic calendar integration",
+                          "Standard trip planning tools"
+                        ].map((feature, index) => (
+                          <li key={index} className="flex items-start gap-2 text-gray-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 text-green-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            <span className="text-xs sm:text-sm">{feature}</span>
+                          </li>
+                        ))}
                       </ul>
 
                       <button
@@ -729,69 +708,51 @@ const OnboardingPage = () => {
                       </button>
                     </div>
 
+                    {/* Yearly Plan */}
                     <div className={getPlanCardStyle("yearly")}>
                       {!isPlanActive('yearly') && (
-                        <div className="absolute -top-3 right-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-black text-xs font-bold py-1 px-4 rounded-full">
-                          BEST VALUE • Save 50%
+                        <div className="absolute -top-2 sm:-top-3 right-2 sm:right-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-black text-xs font-bold py-1 px-2 sm:px-4 rounded-full">
+                          <span className="hidden sm:inline">BEST VALUE • Save 50%</span>
+                          <span className="sm:hidden">SAVE 50%</span>
                         </div>
                       )}
 
-                      <div className="text-center mb-4">
+                      <div className="text-center mb-3 sm:mb-4">
                         <div className="flex items-center justify-center gap-2 mb-2">
-                          <h4 className="text-xl font-bold text-white">Yearly Plan</h4>
+                          <h4 className="text-lg sm:text-xl font-bold text-white">Yearly Plan</h4>
                           {isPlanActive('yearly') && <Check size={20} className="text-green-400" />}
                         </div>
                         <div className="inline-flex items-center gap-1 mb-1">
-                          <span className="text-3xl font-bold text-white">₹499</span>
-                          <span className="text-gray-400">/year</span>
+                          <span className="text-2xl sm:text-3xl font-bold text-white">₹499</span>
+                          <span className="text-gray-400 text-sm sm:text-base">/year</span>
                         </div>
-                        <p className="text-yellow-300 text-sm">Just ₹25 per month</p>
-                        <div className="h-[1px] w-full bg-white/20 my-4"></div>
+                        <p className="text-yellow-300 text-xs sm:text-sm">Just ₹25 per month</p>
+                        <div className="h-[1px] w-full bg-white/20 my-3 sm:my-4"></div>
                       </div>
 
-                      <ul className="space-y-3 mb-6">
+                      {/* Features List */}
+                      <ul className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
                         <li className="flex items-start gap-2 text-gray-200">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                           </svg>
-                          <span className="font-medium">Everything in Monthly Plan, plus:</span>
+                          <span className="font-medium text-xs sm:text-sm">Everything in Monthly Plan, plus:</span>
                         </li>
-                        <li className="flex items-start gap-2 text-gray-200">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span>Priority booking assistance with VIP access</span>
-                        </li>
-                        <li className="flex items-start gap-2 text-gray-200">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span>Exclusive festival access and hidden events</span>
-                        </li>
-                        <li className="flex items-start gap-2 text-gray-200">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span>Full video briefings with Tavus (250 mins)</span>
-                        </li>
-                        <li className="flex items-start gap-2 text-gray-200">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span>Multilingual voice AI concierge (unlimited)</span>
-                        </li>
-                        <li className="flex items-start gap-2 text-gray-200">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span>Includes 6 AI-powered video generations</span>
-                        </li>
-                        <li className="flex items-start gap-2 text-gray-200">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span>Early bird access to festival tickets</span>
-                        </li>
+                        {[
+                          "Priority booking assistance with VIP access",
+                          "Exclusive festival access and hidden events",
+                          "Full video briefings with Tavus (250 mins)",
+                          "Multilingual voice AI concierge (unlimited)",
+                          "Includes 6 AI-powered video generations",
+                          "Early bird access to festival tickets"
+                        ].map((feature, index) => (
+                          <li key={index} className="flex items-start gap-2 text-gray-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            <span className="text-xs sm:text-sm">{feature}</span>
+                          </li>
+                        ))}
                       </ul>
 
                       <button
@@ -804,9 +765,10 @@ const OnboardingPage = () => {
                     </div>
                   </div>
 
+                  {/* Close Button */}
                   <button
                     onClick={() => setShowPremium(false)}
-                    className="mt-6 mx-auto block px-6 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors"
+                    className="mt-4 sm:mt-6 mx-auto block px-4 sm:px-6 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors text-sm sm:text-base"
                   >
                     Maybe Later
                   </button>
