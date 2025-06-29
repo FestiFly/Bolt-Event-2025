@@ -38,7 +38,8 @@ urlpatterns = [
 
 
     #test urls
-    path('heygen-generate/', generate_heygen_video, name='generate_heygen_video'),
+    path('tavus-generate/', generate_tavus_video, name='generate_heygen_video'),
+    path('get-tavus-video/', get_tavus_video, name='get_tavus_video'),
     path("ask/", ask_bot, name="ask_bot")
 
 ]
