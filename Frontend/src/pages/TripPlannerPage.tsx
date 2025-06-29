@@ -5,10 +5,10 @@ import { jwtDecode } from 'jwt-decode';
 import Cookies from 'js-cookie';
 import { Component } from '../components/glass-icons';
 import WhatsappIcon from '../assets/share/WhatsApp.svg';
-import TelegramIcon from '../assets/share/telegram.svg';
+import TelegramIcon from '../assets/share/Telegram.svg';
 import DiscordIcon from '../assets/share/Discord.png';
 import EmailIcon from '../assets/share/Gmail.png';
-import TwitterIcon from '../assets/share/x.png';
+import TwitterIcon from '../assets/share/X.png';
 import InstagramIcon from '../assets/share/Instagram.svg';
 
 interface FestivalDetail {

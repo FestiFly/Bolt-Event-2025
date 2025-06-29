@@ -126,7 +126,8 @@ const DiscoveryPage = () => {
     return (
       <span className={`inline-flex items-center space-x-1 px-2 py-1 bg-gradient-to-r ${badgeColor} text-black text-xs font-bold rounded-full`}>
         <Crown className="h-3 w-3" />
-        <span>{badgeText}</span>
+        <span className="hidden sm:inline">{badgeText}</span>
+        <span className="sm:hidden">PRO</span>
       </span>
     );
   };
@@ -695,7 +696,7 @@ const DiscoveryPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center "
+      <div className="min-h-screen flex items-center justify-center px-4"
         style={{ 
           backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))",
           backgroundAttachment: "fixed",
@@ -709,42 +710,46 @@ const DiscoveryPage = () => {
   }
 
   return (
-    <div className="min-h-screen py-8 px-4" style={{ backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))",
+    <div className="min-h-screen py-4 sm:py-8 px-4" style={{ backgroundImage: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))",
       backgroundAttachment: "fixed",
      }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-4 items-center">
-          <h1 className="text-4xl font-bold text-white mb-4 bg-clip-text text-transparent">
+        <div className="text-center mb-4 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-4 bg-clip-text text-transparent">
             Festival Discoveries
           </h1>
-          <div className='flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0 sm:space-x-4 mb-6'>
-            {user && (
-              <div className="flex items-center justify-between space-x-3 w-1/4 bg-white/10 backdrop-blur-lg rounded-lg px-4 py-2 border border-white/20">
-                <div className="text-white text-sm">
+          
+          {/* User Welcome Section - Responsive */}
+          {user && (
+            <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-between space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
+              <div className="flex items-center justify-center sm:justify-start space-x-3 w-full sm:w-auto bg-white/10 backdrop-blur-lg rounded-lg px-4 py-2 border border-white/20">
+                <div className="text-white text-sm text-center sm:text-left">
                   Welcome back, <span className="font-semibold">{user.username}</span>
                 </div>
                 {getPremiumBadge()}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
+          {/* Results Summary - Responsive */}
+          <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-end space-y-2 sm:space-y-0 mb-2">
+            <p className="text-gray-300 text-xs text-center sm:text-right">
+              {searchParams?.location && `Near ${searchParams.location} • `}
+              {searchParams?.startDate && `${searchParams.startDate} • `}
+              {filteredAndSortedFestivals.length} of {festivals.length} festivals
+            </p>
+          </div>
         </div>
-        <div className='flex flex-col sm:flex-row items-right justify-between ml-[1150px] mb-2'>
-          <p className="text-gray-300 text-xs">
-            {searchParams?.location && `Near ${searchParams.location} • `}
-            {searchParams?.startDate && `${searchParams.startDate} • `}
-            {filteredAndSortedFestivals.length} of {festivals.length} festivals
-          </p>
-        </div>
-        {/* Premium Modal - Same as OnboardingPage */}
+
+        {/* Premium Modal - Responsive */}
         {showPremiumModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-4xl w-full border border-white/20 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 sm:p-8 max-w-4xl w-full border border-white/20 max-h-[90vh] overflow-y-auto">
               <div className="text-center mb-6">
-                <Crown className="h-16 w-16 text-yellow-400 mx-auto mb-4" />
-                <h3 className="text-2xl font-bold text-white mb-2">Upgrade Your Festival Experience</h3>
-                <p className="text-gray-300">Choose the plan that fits your festival lifestyle</p>
+                <Crown className="h-12 sm:h-16 w-12 sm:w-16 text-yellow-400 mx-auto mb-4" />
+                <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">Upgrade Your Festival Experience</h3>
+                <p className="text-gray-300 text-sm sm:text-base">Choose the plan that fits your festival lifestyle</p>
 
                 {userPremiumStatus?.is_active && (
                   <div className="inline-flex items-center gap-2 bg-green-500/20 border border-green-500/30 rounded-lg px-4 py-2 mt-4">
@@ -753,8 +758,8 @@ const DiscoveryPage = () => {
                       Currently subscribed to {userPremiumStatus.plan} plan
                       {userPremiumStatus.expires_at && (
                         <>
-                          <span className="mx-1">•</span>
-                          <span title={formatDateTime(userPremiumStatus.expires_at)}>
+                          <span className="mx-1 hidden sm:inline">•</span>
+                          <span className="block sm:inline" title={formatDateTime(userPremiumStatus.expires_at)}>
                             {getRemainingTime(userPremiumStatus.expires_at)}
                           </span>
                         </>
@@ -764,53 +769,53 @@ const DiscoveryPage = () => {
                 )}
               </div>
 
-              <div className="flex flex-col md:flex-row gap-6">
+              <div className="flex flex-col lg:flex-row gap-6">
                 {/* Monthly Plan */}
                 <div className={getPlanCardStyle("monthly")}>
                   <div className="text-center mb-4">
                     <div className="flex items-center justify-center gap-2 mb-2">
-                      <h4 className="text-xl font-bold text-white">Monthly Plan</h4>
+                      <h4 className="text-lg sm:text-xl font-bold text-white">Monthly Plan</h4>
                       {isPlanActive('monthly') && <Check size={20} className="text-green-400" />}
                     </div>
                     <div className="inline-flex items-center gap-1 mb-4">
-                      <span className="text-3xl font-bold text-white">₹49</span>
+                      <span className="text-2xl sm:text-3xl font-bold text-white">₹49</span>
                       <span className="text-gray-400">/month</span>
                     </div>
                     <div className="h-[1px] w-full bg-white/20 my-4"></div>
                   </div>
 
                   <ul className="space-y-3 mb-6">
-                    <li className="flex items-start gap-2 text-gray-200">
+                    <li className="flex items-start gap-2 text-gray-200 text-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       <span>Unlimited festival searches across India</span>
                     </li>
-                    <li className="flex items-start gap-2 text-gray-200">
+                    <li className="flex items-start gap-2 text-gray-200 text-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       <span>Basic AI-powered recommendations</span>
                     </li>
-                    <li className="flex items-start gap-2 text-gray-200">
+                    <li className="flex items-start gap-2 text-gray-200 text-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       <span>Limited voice assistant (30 mins/month)</span>
                     </li>
-                    <li className="flex items-start gap-2 text-gray-200">
+                    <li className="flex items-start gap-2 text-gray-200 text-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       <span>Includes 2 AI-powered video generations</span>
                     </li>
-                    <li className="flex items-start gap-2 text-gray-200">
+                    <li className="flex items-start gap-2 text-gray-200 text-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       <span>Basic calendar integration</span>
                     </li>
-                    <li className="flex items-start gap-2 text-gray-200">
+                    <li className="flex items-start gap-2 text-gray-200 text-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
@@ -831,17 +836,18 @@ const DiscoveryPage = () => {
                 <div className={getPlanCardStyle("yearly")}>
                   {!isPlanActive('yearly') && (
                     <div className="absolute -top-3 right-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-black text-xs font-bold py-1 px-4 rounded-full">
-                      BEST VALUE • Save 50%
+                      <span className="hidden sm:inline">BEST VALUE • Save 50%</span>
+                      <span className="sm:hidden">SAVE 50%</span>
                     </div>
                   )}
 
                   <div className="text-center mb-4">
                     <div className="flex items-center justify-center gap-2 mb-2">
-                      <h4 className="text-xl font-bold text-white">Yearly Plan</h4>
+                      <h4 className="text-lg sm:text-xl font-bold text-white">Yearly Plan</h4>
                       {isPlanActive('yearly') && <Check size={20} className="text-green-400" />}
                     </div>
                     <div className="inline-flex items-center gap-1 mb-1">
-                      <span className="text-3xl font-bold text-white">₹499</span>
+                      <span className="text-2xl sm:text-3xl font-bold text-white">₹499</span>
                       <span className="text-gray-400">/year</span>
                     </div>
                     <p className="text-yellow-300 text-sm">Just ₹25 per month</p>
@@ -849,43 +855,43 @@ const DiscoveryPage = () => {
                   </div>
 
                   <ul className="space-y-3 mb-6">
-                    <li className="flex items-start gap-2 text-gray-200">
+                    <li className="flex items-start gap-2 text-gray-200 text-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       <span className="font-medium">Everything in Monthly Plan, plus:</span>
                     </li>
-                    <li className="flex items-start gap-2 text-gray-200">
+                    <li className="flex items-start gap-2 text-gray-200 text-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       <span>Priority booking assistance with VIP access</span>
                     </li>
-                    <li className="flex items-start gap-2 text-gray-200">
+                    <li className="flex items-start gap-2 text-gray-200 text-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       <span>Exclusive festival access and hidden events</span>
                     </li>
-                    <li className="flex items-start gap-2 text-gray-200">
+                    <li className="flex items-start gap-2 text-gray-200 text-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       <span>Full video briefings with Tavus (250 mins)</span>
                     </li>
-                    <li className="flex items-start gap-2 text-gray-200">
+                    <li className="flex items-start gap-2 text-gray-200 text-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       <span>Multilingual voice AI concierge (unlimited)</span>
                     </li>
-                    <li className="flex items-start gap-2 text-gray-200">
+                    <li className="flex items-start gap-2 text-gray-200 text-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       <span>Includes 6 AI-powered video generations</span>
                     </li>
-                    <li className="flex items-start gap-2 text-gray-200">
+                    <li className="flex items-start gap-2 text-gray-200 text-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
@@ -913,76 +919,78 @@ const DiscoveryPage = () => {
           </div>
         )}
 
-        {/* Search and Filter Section */}
-        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 mb-8">
+        {/* Search and Filter Section - Responsive */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 sm:p-6 border border-white/20 mb-6 sm:mb-8">
           {/* Main Search Bar */}
-          <div className="relative mb-6">
+          <div className="relative mb-4 sm:mb-6">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search festivals by name, location, tags, or description..."
+              placeholder="Search festivals by name, location, tags..."
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-lg"
+              className="w-full pl-12 pr-4 py-3 sm:py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base sm:text-lg"
             />
           </div>
 
-          {/* Quick Filters */}
-          <div className="flex flex-wrap items-center gap-4 mb-6">
+          {/* Quick Filters - Responsive */}
+          <div className="flex flex-col space-y-4 mb-4 sm:mb-6">
             <div className="flex items-center space-x-2">
               <Filter className="h-5 w-5 text-purple-400" />
-              <span className="text-white font-medium">Quick Filters:</span>
+              <span className="text-white font-medium text-sm sm:text-base">Quick Filters:</span>
             </div>
 
-            {/* Filter Buttons */}
-            <button
-              onClick={() => handleFilterChange('vibeFilter', filters.vibeFilter === 'positive' ? 'all' : 'positive')}
-              className={`px-4 py-2 rounded-lg transition-all ${filters.vibeFilter === 'positive'
-                ? 'bg-green-600 text-white shadow-lg'
-                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                }`}
-            >
-              🎉 Highly Rated
-            </button>
+            {/* Filter Buttons - Responsive Grid */}
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4">
+              <button
+                onClick={() => handleFilterChange('vibeFilter', filters.vibeFilter === 'positive' ? 'all' : 'positive')}
+                className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-sm ${filters.vibeFilter === 'positive'
+                  ? 'bg-green-600 text-white shadow-lg'
+                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                  }`}
+              >
+                🎉 <span className="hidden sm:inline">Highly Rated</span><span className="sm:hidden">Rated</span>
+              </button>
 
-            <button
-              onClick={() => handleFilterChange('month', filters.month === 'July' ? '' : 'July')}
-              className={`px-4 py-2 rounded-lg transition-all ${filters.month === 'July'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                }`}
-            >
-              📅 July Events
-            </button>
+              <button
+                onClick={() => handleFilterChange('month', filters.month === 'July' ? '' : 'July')}
+                className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-sm ${filters.month === 'July'
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                  }`}
+              >
+                📅 <span className="hidden sm:inline">July Events</span><span className="sm:hidden">July</span>
+              </button>
 
-            <button
-              onClick={() => handleFilterChange('tags', filters.tags.includes('music') ? filters.tags.filter(t => t !== 'music') : [...filters.tags, 'music'])}
-              className={`px-4 py-2 rounded-lg transition-all ${filters.tags.includes('music')
-                ? 'bg-purple-600 text-white shadow-lg'
-                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                }`}
-            >
-              🎵 Music
-            </button>
+              <button
+                onClick={() => handleFilterChange('tags', filters.tags.includes('music') ? filters.tags.filter(t => t !== 'music') : [...filters.tags, 'music'])}
+                className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-sm ${filters.tags.includes('music')
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                  }`}
+              >
+                🎵 Music
+              </button>
 
-            <button
-              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${showAdvancedFilters
-                ? 'bg-orange-600 text-white shadow-lg'
-                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                }`}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              <span>Advanced</span>
-              {activeFiltersCount > 0 && (
-                <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
-                  {activeFiltersCount}
-                </span>
-              )}
-            </button>
+              <button
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className={`flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 rounded-lg transition-all text-sm ${showAdvancedFilters
+                  ? 'bg-orange-600 text-white shadow-lg'
+                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                  }`}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                <span>Advanced</span>
+                {activeFiltersCount > 0 && (
+                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
+                    {activeFiltersCount}
+                  </span>
+                )}
+              </button>
+            </div>
 
-            {/* ✅ User Status and Personalized Button aligned to right */}
-            <div className="ml-auto flex items-center gap-4">
+            {/* Personalized Button and Clear All - Responsive */}
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 sm:items-center sm:justify-between">
               <div className="relative">
                 {/* Glow Border */}
                 {isPremiumUser() && (
@@ -992,13 +1000,13 @@ const DiscoveryPage = () => {
                 <button
                   onClick={fetchPersonalizedFestivals}
                   disabled={personalizedLoading}
-                  className={`relative px-6 py-3 rounded-xl font-semibold text-base shadow-lg transition-all duration-300 transform hover:scale-105 hover:brightness-110
-          ${isPremiumUser()
+                  className={`relative w-full sm:w-auto px-4 sm:px-6 py-3 rounded-xl font-semibold text-sm sm:text-base shadow-lg transition-all duration-300 transform hover:scale-105 hover:brightness-110
+            ${isPremiumUser()
                       ? 'bg-neutral-900 text-white border border-[#D4AF37]/50'
                       : 'bg-neutral-700 text-gray-300 cursor-not-allowed'
                     } ${personalizedLoading ? 'opacity-60' : ''}`}
                 >
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center justify-center space-x-2">
                     {isPremiumUser() ? (
                       <Sparkles className="h-5 w-5 text-yellow-400" />
                     ) : (
@@ -1013,35 +1021,34 @@ const DiscoveryPage = () => {
                   </div>
                 </button>
               </div>
-            </div>
 
-            {/* Clear All Button */}
-            {activeFiltersCount > 0 && (
-              <button
-                onClick={clearAllFilters}
-                className="flex items-center space-x-2 px-4 py-2 bg-red-600/20 text-red-200 border border-red-400/30 rounded-lg hover:bg-red-600/30 transition-all"
-              >
-                <X className="h-4 w-4" />
-                <span>Clear All</span>
-              </button>
-            )}
+              {/* Clear All Button */}
+              {activeFiltersCount > 0 && (
+                <button
+                  onClick={clearAllFilters}
+                  className="flex items-center justify-center space-x-2 px-4 py-2 bg-red-600/20 text-red-200 border border-red-400/30 rounded-lg hover:bg-red-600/30 transition-all text-sm"
+                >
+                  <X className="h-4 w-4" />
+                  <span>Clear All</span>
+                </button>
+              )}
+            </div>
           </div>
 
-
-          {/* Advanced Filters */}
+          {/* Advanced Filters - Responsive */}
           {showAdvancedFilters && (
-            <div className="border-t border-white/20 pt-6 space-y-6 animate-fadeIn">
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="border-t border-white/20 pt-4 sm:pt-6 space-y-4 sm:space-y-6 animate-fadeIn">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Location Filter */}
                 <div>
-                  <label className="text-white font-medium mb-2 flex items-center space-x-2">
+                  <label className="text-white font-medium mb-2 flex items-center space-x-2 text-sm sm:text-base">
                     <MapPin className="h-4 w-4 text-purple-400" />
                     <span>Location</span>
                   </label>
                   <select
                     value={filters.location}
                     onChange={(e) => handleFilterChange('location', e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                   >
                     <option value="">All Locations</option>
                     {locations.map(loc => (
@@ -1052,14 +1059,14 @@ const DiscoveryPage = () => {
 
                 {/* Month Filter */}
                 <div>
-                  <label className="text-white font-medium mb-2 flex items-center space-x-2">
+                  <label className="text-white font-medium mb-2 flex items-center space-x-2 text-sm sm:text-base">
                     <Calendar className="h-4 w-4 text-purple-400" />
                     <span>Month</span>
                   </label>
                   <select
                     value={filters.month}
                     onChange={(e) => handleFilterChange('month', e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                   >
                     <option value="">All Months</option>
                     {months.map(month => (
@@ -1070,7 +1077,7 @@ const DiscoveryPage = () => {
 
                 {/* Minimum Upvotes */}
                 <div>
-                  <label className="text-white font-medium mb-2 flex items-center space-x-2">
+                  <label className="text-white font-medium mb-2 flex items-center space-x-2 text-sm sm:text-base">
                     <TrendingUp className="h-4 w-4 text-purple-400" />
                     <span>Min Upvotes</span>
                   </label>
@@ -1079,21 +1086,21 @@ const DiscoveryPage = () => {
                     min="0"
                     value={filters.minUpvotes}
                     onChange={(e) => handleFilterChange('minUpvotes', parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                     placeholder="0"
                   />
                 </div>
 
                 {/* Sort By */}
                 <div>
-                  <label className="text-white font-medium mb-2 flex items-center space-x-2">
+                  <label className="text-white font-medium mb-2 flex items-center space-x-2 text-sm sm:text-base">
                     <Star className="h-4 w-4 text-purple-400" />
                     <span>Sort By</span>
                   </label>
                   <select
                     value={filters.sortBy}
                     onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                   >
                     <option value="relevance" className="bg-gray-800">Relevance</option>
                     <option value="upvotes" className="bg-gray-800">Most Upvoted</option>
@@ -1103,18 +1110,18 @@ const DiscoveryPage = () => {
                 </div>
               </div>
 
-              {/* Tags Filter */}
+              {/* Tags Filter - Responsive */}
               <div>
-                <label className="text-white font-medium mb-3 flex items-center space-x-2">
+                <label className="text-white font-medium mb-3 flex items-center space-x-2 text-sm sm:text-base">
                   <Tag className="h-4 w-4 text-purple-400" />
                   <span>Festival Types</span>
                 </label>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-9 gap-2">
                   {popularTags.map(tag => (
                     <button
                       key={tag}
                       onClick={() => handleTagToggle(tag)}
-                      className={`px-3 py-1 rounded-full text-sm transition-all capitalize ${filters.tags.includes(tag)
+                      className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm transition-all capitalize ${filters.tags.includes(tag)
                         ? 'bg-purple-600 text-white shadow-lg border-2 border-purple-400'
                         : 'bg-white/10 text-gray-300 hover:bg-white/20 border border-white/20'
                         }`}
@@ -1128,8 +1135,8 @@ const DiscoveryPage = () => {
           )}
         </div>
 
-        {/* Results Summary */}
-        <div className="flex items-center justify-between mb-6">
+        {/* Results Summary - Responsive */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 space-y-2 sm:space-y-0">
           <div className="text-gray-300">
             <span className="text-lg font-semibold text-white">{filteredAndSortedFestivals.length}</span> festivals found
             {activeFiltersCount > 0 && (
@@ -1144,8 +1151,8 @@ const DiscoveryPage = () => {
           )}
         </div>
 
-        {/* Festival Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {/* Festival Grid - Responsive */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {currentFestivals.map((festival, index) => (
             <div
               key={festival._id}
@@ -1156,52 +1163,52 @@ const DiscoveryPage = () => {
                 <img
                   src={getRandomImage()}
                   alt={festival.title || 'Festival'}
-                  className="w-full h-48 object-cover"
+                  className="w-full h-40 sm:h-48 object-cover"
                 />
-                <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1">
-                  <span className="text-2xl">{getVibeEmoji(festival.vibe_score)}</span>
+                <div className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-black/50 backdrop-blur-sm rounded-full px-2 sm:px-3 py-1">
+                  <span className="text-xl sm:text-2xl">{getVibeEmoji(festival.vibe_score)}</span>
                 </div>
-                <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1 flex items-center space-x-1">
-                  <ThumbsUp className="h-4 w-4 text-orange-400" />
-                  <span className="text-white text-sm font-semibold">{festival.upvotes || 0}</span>
+                <div className="absolute top-2 sm:top-4 left-2 sm:left-4 bg-black/50 backdrop-blur-sm rounded-full px-2 sm:px-3 py-1 flex items-center space-x-1">
+                  <ThumbsUp className="h-3 sm:h-4 w-3 sm:w-4 text-orange-400" />
+                  <span className="text-white text-xs sm:text-sm font-semibold">{festival.upvotes || 0}</span>
                 </div>
-                <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1">
+                <div className="absolute bottom-2 sm:bottom-4 left-2 sm:left-4 bg-black/50 backdrop-blur-sm rounded-full px-2 sm:px-3 py-1">
                   <span className="text-white text-xs font-medium">{getVibeLabel(festival.vibe_score)}</span>
                 </div>
               </div>
 
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-white mb-2 line-clamp-2">{festival.title || 'Untitled Festival'}</h3>
+              <div className="p-4 sm:p-6">
+                <h3 className="text-lg sm:text-xl font-bold text-white mb-2 line-clamp-2">{festival.title || 'Untitled Festival'}</h3>
                 <p className="text-gray-300 mb-4 text-sm leading-relaxed">
                   {truncateContent(festival.content)}
                 </p>
 
-                <div className="space-y-3 mb-6">
+                <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
                   <div className="flex items-center space-x-2 text-gray-300">
-                    <MapPin className="h-4 w-4 text-purple-400" />
-                    <span className="text-sm">{festival.location || 'Location TBD'}</span>
+                    <MapPin className="h-3 sm:h-4 w-3 sm:w-4 text-purple-400 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm truncate">{festival.location || 'Location TBD'}</span>
                   </div>
                   <div className="flex items-center space-x-2 text-gray-300">
-                    <Calendar className="h-4 w-4 text-purple-400" />
-                    <span className="text-sm">{formatDate(festival.month)}</span>
+                    <Calendar className="h-3 sm:h-4 w-3 sm:w-4 text-purple-400 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm">{formatDate(festival.month)}</span>
                   </div>
                   <div className="flex items-center space-x-2 text-gray-300">
-                    <Users className="h-4 w-4 text-purple-400" />
-                    <span className="text-sm">{festival.upvotes || 0} community upvotes</span>
+                    <Users className="h-3 sm:h-4 w-3 sm:w-4 text-purple-400 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm">{festival.upvotes || 0} community upvotes</span>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 mb-6">
+                <div className="flex flex-wrap gap-1 sm:gap-2 mb-4 sm:mb-6">
                   {festival.tags && Array.isArray(festival.tags) && festival.tags.slice(0, 3).map((tag) => (
                     <span
                       key={tag}
-                      className="px-3 py-1 bg-purple-600/30 text-purple-200 rounded-full text-xs border border-purple-400/30 capitalize"
+                      className="px-2 sm:px-3 py-1 bg-purple-600/30 text-purple-200 rounded-full text-xs border border-purple-400/30 capitalize"
                     >
                       {tag || 'tag'}
                     </span>
                   ))}
                   {festival.tags && Array.isArray(festival.tags) && festival.tags.length > 3 && (
-                    <span className="px-3 py-1 bg-gray-600/30 text-gray-200 rounded-full text-xs border border-gray-400/30">
+                    <span className="px-2 sm:px-3 py-1 bg-gray-600/30 text-gray-200 rounded-full text-xs border border-gray-400/30">
                       +{festival.tags.length - 3} more
                     </span>
                   )}
@@ -1210,7 +1217,7 @@ const DiscoveryPage = () => {
                 <div className="flex gap-2">
                   <button
                     onClick={() => navigate(`/trip/${festival._id}`)}
-                    className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl text-sm"
+                    className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 sm:py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl text-xs sm:text-sm"
                   >
                     View Details
                   </button>
@@ -1219,63 +1226,82 @@ const DiscoveryPage = () => {
                       href={festival.reddit_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-3 bg-orange-600/20 text-orange-200 border border-orange-400/30 rounded-lg hover:bg-orange-600/30 transition-colors flex items-center justify-center"
+                      className="px-3 sm:px-4 py-2 sm:py-3 bg-orange-600/20 text-orange-200 border border-orange-400/30 rounded-lg hover:bg-orange-600/30 transition-colors flex items-center justify-center"
                     >
-                      <ExternalLink className="h-4 w-4" />
+                      <ExternalLink className="h-3 sm:h-4 w-3 sm:w-4" />
                     </a>
                   )}
                 </div>
               </div>
             </div>
           ))}
-          <div className="flex justify-center items-center gap-4 mt-8 ml-[615px]">
+        </div>
+
+        {/* Pagination - Responsive */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-4 mt-6 sm:mt-8">
             <button
               onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
-              className={`px-4 py-2 rounded-lg font-medium ${currentPage === 1 ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : 'bg-white/10 text-white hover:bg-white/20'}`}
+              className={`w-full sm:w-auto px-4 py-2 rounded-lg font-medium text-sm ${currentPage === 1 ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : 'bg-white/10 text-white hover:bg-white/20'}`}
             >
               Previous
             </button>
 
-            {Array.from({ length: totalPages }, (_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentPage(index + 1)}
-                className={`px-3 py-1 rounded-lg text-sm font-semibold ${currentPage === index + 1 ? 'bg-purple-600 text-white' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}
-              >
-                {index + 1}
-              </button>
-            ))}
+            <div className="flex flex-wrap justify-center gap-1 sm:gap-2">
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, index) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = index + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = index + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + index;
+                } else {
+                  pageNum = currentPage - 2 + index;
+                }
+
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-1 rounded-lg text-sm font-semibold ${currentPage === pageNum ? 'bg-purple-600 text-white' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
 
             <button
               onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
               disabled={currentPage === totalPages}
-              className={`px-4 py-2 rounded-lg font-medium ${currentPage === totalPages ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : 'bg-white/10 text-white hover:bg-white/20'}`}
+              className={`w-full sm:w-auto px-4 py-2 rounded-lg font-medium text-sm ${currentPage === totalPages ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : 'bg-white/10 text-white hover:bg-white/20'}`}
             >
               Next
             </button>
           </div>
-        </div>
+        )}
 
-        {/* No Results */}
+        {/* No Results - Responsive */}
         {filteredAndSortedFestivals.length === 0 && (
-          <div className="text-center py-12">
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 max-w-md mx-auto">
-              <Search className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">No Festivals Found</h3>
-              <p className="text-gray-400 mb-6">
+          <div className="text-center py-8 sm:py-12">
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 sm:p-8 border border-white/20 max-w-md mx-auto">
+              <Search className="h-12 sm:h-16 w-12 sm:w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">No Festivals Found</h3>
+              <p className="text-gray-400 mb-6 text-sm sm:text-base">
                 No festivals match your current search and filter criteria.
               </p>
               <div className="space-y-3">
                 <button
                   onClick={clearAllFilters}
-                  className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
+                  className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold text-sm sm:text-base"
                 >
                   Clear All Filters
                 </button>
                 <button
                   onClick={() => navigate('/')}
-                  className="w-full px-6 py-3 bg-white/10 text-white border border-white/20 rounded-lg hover:bg-white/20 transition-colors"
+                  className="w-full px-6 py-3 bg-white/10 text-white border border-white/20 rounded-lg hover:bg-white/20 transition-colors text-sm sm:text-base"
                 >
                   Start New Search
                 </button>
@@ -1285,16 +1311,16 @@ const DiscoveryPage = () => {
         )}
 
         {festivals.length === 0 && !loading && (
-          <div className="text-center py-12">
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 max-w-md mx-auto">
-              <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">No Festivals Available</h3>
-              <p className="text-gray-400 mb-6">
+          <div className="text-center py-8 sm:py-12">
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 sm:p-8 border border-white/20 max-w-md mx-auto">
+              <Calendar className="h-12 sm:h-16 w-12 sm:w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">No Festivals Available</h3>
+              <p className="text-gray-400 mb-6 text-sm sm:text-base">
                 No festivals found in our database. Please try again later.
               </p>
               <button
                 onClick={() => navigate('/')}
-                className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
+                className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold text-sm sm:text-base"
               >
                 Go Back Home
               </button>
@@ -1318,6 +1344,17 @@ const DiscoveryPage = () => {
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
+        }
+
+        .glow-border {
+          background: linear-gradient(45deg, #D4AF37, #FFD700, #D4AF37);
+          background-size: 200% 200%;
+          animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+          0% { background-position: 0% 50%; }
+          100% { background-position: 100% 50%; }
         }
       `}</style>
     </div>
