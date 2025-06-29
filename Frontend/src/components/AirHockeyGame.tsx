@@ -5,45 +5,38 @@ import bg2 from '../../src/assets/music/2.mp3';
 interface AirHockeyGameProps {
   jwtData?: {
     username?: string;
-    // add other fields if needed
   };
 }
 
 const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ jwtData }) => {
-  const canvasRef = useRef(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [playerScore, setPlayerScore] = useState(0);
   const [botScore, setBotScore] = useState(0);
   const [soundOn, setSoundOn] = useState(true);
   const [isGamePaused, setIsGamePaused] = useState(false);
-  const backgroundMusicRef = useRef(null);
+  const backgroundMusicRef = useRef<HTMLAudioElement | null>(null);
 
-  // Extract username from JWT data or default to "You"
-  const username = jwtData ? jwtData.username : "You";
-
-  // List of background music files using imported files
+  const username = jwtData?.username || "You";
   const backgroundMusicFiles = [bg1, bg2];
 
   const playBackgroundMusic = useCallback(() => {
     if (!soundOn) return;
 
-    // Clear any existing background music
     if (backgroundMusicRef.current) {
       backgroundMusicRef.current.pause();
       backgroundMusicRef.current = null;
     }
 
-    // Randomly select a music file
     const randomIndex = Math.floor(Math.random() * backgroundMusicFiles.length);
     const musicFile = backgroundMusicFiles[randomIndex];
 
-    // Create and play the audio element
     backgroundMusicRef.current = new Audio(musicFile);
     backgroundMusicRef.current.loop = true;
-    backgroundMusicRef.current.volume = 0.3; // Set volume lower for background music
+    backgroundMusicRef.current.volume = 0.3;
     backgroundMusicRef.current.play().catch(e => console.log("Background music play failed:", e));
   }, [soundOn]);
 
-  const playSound = useCallback((type) => {
+  const playSound = useCallback((type: string) => {
     if (!soundOn) return;
 
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -94,7 +87,6 @@ const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ jwtData }) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size to fit the screen
     const resizeCanvas = () => {
       const maxWidth = window.innerWidth * 0.9;
       const maxHeight = window.innerHeight * 0.7;
@@ -114,7 +106,6 @@ const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ jwtData }) => {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Simple ball object
     const ball = {
       x: canvas.width / 2,
       y: canvas.height / 2,
@@ -123,30 +114,22 @@ const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ jwtData }) => {
       radius: 8
     };
 
-    // Game state
     let gameStarted = false;
     let countdown = 3;
-    let countdownInterval = null;
-
-    // Simple player paddle
+    let countdownInterval: NodeJS.Timeout | null = null;
     let playerY = canvas.height / 2 - 30;
     let botY = canvas.height / 2 - 30;
-
-    // Goal dimensions
     const goalHeight = canvas.height * 0.2;
     const goalWidth = 20;
 
     const draw = () => {
-      // Clear canvas
       ctx.fillStyle = '#1E1B4B';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Draw playing area
       ctx.strokeStyle = '#374151';
       ctx.lineWidth = 2;
       ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
 
-      // Draw center line
       ctx.setLineDash([5, 5]);
       ctx.beginPath();
       ctx.moveTo(canvas.width / 2, 20);
@@ -154,12 +137,10 @@ const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ jwtData }) => {
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Draw center circle
       ctx.beginPath();
       ctx.arc(canvas.width / 2, canvas.height / 2, 30, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw goals
       ctx.strokeStyle = '#F59E0B';
       ctx.beginPath();
       ctx.moveTo(0, canvas.height / 2 - goalHeight / 2);
@@ -176,21 +157,17 @@ const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ jwtData }) => {
       ctx.lineTo(canvas.width, canvas.height / 2 + goalHeight / 2);
       ctx.stroke();
 
-      // Draw player paddle
       ctx.fillStyle = '#FACC15';
       ctx.fillRect(20, playerY, 10, 60);
 
-      // Draw bot paddle
       ctx.fillStyle = '#22D3EE';
       ctx.fillRect(canvas.width - 30, botY, 10, 60);
 
-      // Draw ball
       ctx.beginPath();
       ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
       ctx.fillStyle = '#E879F9';
       ctx.fill();
 
-      // Draw score
       ctx.fillStyle = '#FACC15';
       ctx.font = 'bold 24px Arial';
       ctx.textAlign = 'center';
@@ -199,7 +176,6 @@ const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ jwtData }) => {
       ctx.fillStyle = '#22D3EE';
       ctx.fillText(botScore.toString(), canvas.width * 3 / 4, 40);
 
-      // Draw pause overlay if game is paused
       if (isGamePaused) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -210,7 +186,6 @@ const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ jwtData }) => {
         ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
       }
 
-      // Draw countdown if game hasn't started
       if (!gameStarted && !isGamePaused) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -231,16 +206,13 @@ const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ jwtData }) => {
 
     const update = () => {
       if (gameStarted && !isGamePaused) {
-        // Move ball
         ball.x += ball.vx;
         ball.y += ball.vy;
 
-        // Bounce off top/bottom walls
         if (ball.y <= 20 + ball.radius || ball.y >= canvas.height - 20 - ball.radius) {
           ball.vy = -ball.vy;
         }
 
-        // Bounce off paddles with angle based on hit position
         if (ball.x <= 30 + ball.radius && ball.y >= playerY && ball.y <= playerY + 60 && ball.vx < 0) {
           ball.vx = Math.abs(ball.vx);
           const hitPos = (ball.y - (playerY + 30)) / 30;
@@ -255,7 +227,6 @@ const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ jwtData }) => {
           playSound('hit');
         }
 
-        // Simple bot AI - follow ball with some delay
         const botSpeed = 2;
         const targetY = ball.y - 30;
         if (Math.abs(targetY - botY) > 5) {
@@ -266,10 +237,8 @@ const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ jwtData }) => {
           }
         }
 
-        // Keep bot paddle in bounds
         botY = Math.max(20, Math.min(canvas.height - 80, botY));
 
-        // Scoring logic
         if (ball.x < 20) {
           setBotScore(prev => prev + 1);
           playSound('score');
@@ -325,11 +294,19 @@ const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ jwtData }) => {
       requestAnimationFrame(gameLoop);
     };
 
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (e: MouseEvent) => {
       if (!isGamePaused) {
         const rect = canvas.getBoundingClientRect();
         playerY = e.clientY - rect.top - 30;
         playerY = Math.max(20, Math.min(canvas.height - 80, playerY));
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isGamePaused) {
+        const rect = canvas.getBoundingClientRect();
+        const touchY = e.touches[0].clientY - rect.top - 30;
+        playerY = Math.max(20, Math.min(canvas.height - 80, touchY));
       }
     };
 
@@ -342,6 +319,7 @@ const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ jwtData }) => {
     };
 
     canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('touchmove', handleTouchMove);
     canvas.addEventListener('mouseleave', handleMouseLeave);
     canvas.addEventListener('mouseenter', handleMouseEnter);
 
@@ -350,6 +328,7 @@ const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ jwtData }) => {
 
     return () => {
       canvas.removeEventListener('mousemove', handleMouseMove);
+      canvas.removeEventListener('touchmove', handleTouchMove);
       canvas.removeEventListener('mouseleave', handleMouseLeave);
       canvas.removeEventListener('mouseenter', handleMouseEnter);
       if (countdownInterval) {
@@ -364,39 +343,43 @@ const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ jwtData }) => {
   };
 
   return (
-    <div className="flex flex-col items-center bg-gray-900 p-6 rounded-lg shadow-xl">
-      <h2 className="text-3xl font-bold text-white mb-4">🏒 Air Hockey</h2>
-      <div className="relative">
-        <canvas
-          ref={canvasRef}
-          style={{
-            border: '4px solid #4F46E5',
-            borderRadius: '10px',
-            backgroundColor: '#1E1B4B',
-            cursor: 'none',
-            display: 'block',
-            boxShadow: '0 0 20px rgba(79, 70, 229, 0.5)'
-          }}
-        />
-      </div>
-      <div className="flex justify-between w-full mt-4 px-4">
-        <div className="text-center">
-          <p className="text-yellow-400 font-bold text-xl">{username}: {playerScore}</p>
+    <div className="game-container">
+      <div className="flex flex-col items-center bg-gray-900 p-6 rounded-lg shadow-xl">
+        <h2 className="text-3xl font-bold text-white mb-4">🏒 Air Hockey</h2>
+        <div className="relative">
+          <canvas
+            ref={canvasRef}
+            style={{
+              border: '4px solid #4F46E5',
+              borderRadius: '10px',
+              backgroundColor: '#1E1B4B',
+              cursor: 'none',
+              display: 'block',
+              boxShadow: '0 0 20px rgba(79, 70, 229, 0.5)',
+              width: '100%',
+              height: 'auto'
+            }}
+          />
         </div>
-        <div className="text-center">
-          <p className="text-blue-400 font-bold text-xl">Bot: {botScore}</p>
+        <div className="flex justify-between w-full mt-4 px-4">
+          <div className="text-center">
+            <p className="text-yellow-400 font-bold text-xl">{username}: {playerScore}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-blue-400 font-bold text-xl">Bot: {botScore}</p>
+          </div>
         </div>
-      </div>
-      <div className="mt-4 text-center">
-        <p className="text-gray-400 text-sm mb-2">
-          Move your mouse to control the yellow paddle
-        </p>
-        <button
-          onClick={toggleSound}
-          className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
-        >
-          {soundOn ? 'Sound: ON' : 'Sound: OFF'}
-        </button>
+        <div className="mt-4 text-center">
+          <p className="text-gray-400 text-sm mb-2">
+            Move your mouse or swipe to control the yellow paddle
+          </p>
+          <button
+            onClick={toggleSound}
+            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
+          >
+            {soundOn ? 'Sound: ON' : 'Sound: OFF'}
+          </button>
+        </div>
       </div>
     </div>
   );

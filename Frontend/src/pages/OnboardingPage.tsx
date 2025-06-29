@@ -53,6 +53,7 @@ const OnboardingPage = () => {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [dotPosition, setDotPosition] = useState({ top: '50%', left: '50%' });
+  const [scrollLocked, setScrollLocked] = useState(false);
 
   useEffect(() => {
     if (!loading) return;
@@ -165,8 +166,22 @@ const OnboardingPage = () => {
     }));
   };
 
+  useEffect(() => {
+    if (scrollLocked) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+
+    // Cleanup function to reset the overflow when the component unmounts
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [scrollLocked]);
+
   const handleFindFestivals = async () => {
-    setLoading(true); // Set loading to true when starting the data fetching
+    setLoading(true);
+    setScrollLocked(true); // Lock scroll when loading starts
     const payload = {
       location: formData.location,
       interests: formData.interests.map(i => i.toLowerCase()),
@@ -190,7 +205,8 @@ const OnboardingPage = () => {
       console.error('Error connecting to backend:', error);
       alert('Failed to fetch recommendations.');
     } finally {
-      setLoading(false); // Set loading to false once the data fetching is complete
+      setLoading(false);
+      setScrollLocked(false); // Unlock scroll when loading ends
     }
   };
 
@@ -487,40 +503,14 @@ const OnboardingPage = () => {
       {loading ? (
         <div className="min-h-screen flex flex-col items-center justify-center px-4 text-center"
           style={{
-            background: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))"
-          }}>
-          <Loader className="h-8 w-8 sm:h-12 sm:w-12 text-purple-400 animate-spin mb-4 sm:mb-6" />
-          <p className="text-white text-lg sm:text-xl animate-pulse px-2">
+            background: "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(0, 0, 0), rgb(49, 46, 129))",
+            overflow: 'hidden'
+          }}
+        ><Loader className="h-8 w-8 sm:h-12 sm:w-12 text-purple-400 animate-spin mb-4 sm:mb-6" />
+        <p className="text-white text-lg sm:text-xl animate-pulse px-2">
             {loaderMessages[currentMessageIndex]}
           </p>
-          <div className="mt-4 sm:mt-6 text-center space-y-2">
-            <p className="text-base sm:text-lg font-semibold text-purple-300 animate-bounce px-2">
-              Your festival lineup is loading... meanwhile, flex those fingers!
-            </p>
-            <p className="text-white text-sm bg-white/10 border border-purple-500/30 px-3 sm:px-4 py-2 rounded-full inline-block shadow-md">
-              🎯 Score: <span className={`font-bold ${getScoreColor()}`}>{score}</span>
-            </p>
-          </div>
-          <div className="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-300 px-2">
-            Current Level:{" "}
-            <span className={`font-semibold ${getScoreColor()}`}>
-              {getCurrentLevel()}
-            </span>
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1 sm:gap-2 text-xs text-white/80 px-2 max-w-4xl">
-            {scoreMilestones.map((milestone, index) => (
-              <div
-                key={index}
-                className={`px-2 sm:px-3 py-1 rounded-full border border-white/10 text-center ${score >= milestone.minScore ? milestone.color : "text-gray-500"
-                  } bg-white/5`}
-              >
-                <div className="hidden sm:block">{milestone.label} ({milestone.minScore}+)</div>
-                <div className="sm:hidden">{milestone.label}</div>
-              </div>
-            ))}
-          </div>
-
+          {/* Loading content */}
           <div className="mt-6 sm:mt-8 w-full max-w-6xl px-2">
             <AirHockeyGame />
           </div>
