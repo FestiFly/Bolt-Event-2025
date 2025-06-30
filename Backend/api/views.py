@@ -22,32 +22,40 @@ import jwt
 from django.conf import settings
 from datetime import datetime, timedelta
 
-# If SECRET_KEY isn't defined elsewhere, add this
-SECRET_KEY = 'FetiFly' 
+# Load secrets from environment variables
+SECRET_KEY = os.environ.get('FESTIFLY_SECRET_KEY', 'FetiFly')
+MONGODB_URI = os.environ.get('FESTIFLY_MONGODB_URI')
+REDDIT_CLIENT_ID = os.environ.get('FESTIFLY_REDDIT_CLIENT_ID')
+REDDIT_CLIENT_SECRET = os.environ.get('FESTIFLY_REDDIT_CLIENT_SECRET')
+REDDIT_USER_AGENT = os.environ.get('FESTIFLY_REDDIT_USER_AGENT', 'festifly-agent')
+GEMINI_API_KEY = os.environ.get('FESTIFLY_GEMINI_API_KEY')
+HEYGEN_API_KEY = os.environ.get('FESTIFLY_HEYGEN_API_KEY')
+FESTIFLY_TAVUS_API_KEY = os.environ.get('FESTIFLY_TAVUS_API_KEY')
+
 # MongoDB setup
-client = MongoClient('mongodb+srv://ihub:akash@ihub.fel24ru.mongodb.net/')
+if not MONGODB_URI:
+    raise Exception('FESTIFLY_MONGODB_URI environment variable not set!')
+client = MongoClient(MONGODB_URI)
 db = client['festifly']
 festival_collection = db['festivals']
-users_collection = db['users']  # Add this line
+users_collection = db['users']
 
 # -------------------------------------------------- Utilities -------------------------------------------------
 # Set up Reddit API client
+if not (REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET):
+    raise Exception('Reddit API credentials not set in environment variables!')
 reddit = praw.Reddit(
-    client_id="3VH_mH98qrCYqfsi7U959A",
-    client_secret="fjqtjosj1j9b5spWZ8YgUQ8N5NNbJw",
-    user_agent="festifly-agent"
+    client_id=REDDIT_CLIENT_ID,
+    client_secret=REDDIT_CLIENT_SECRET,
+    user_agent=REDDIT_USER_AGENT
 )
 
+
 # Gemini setup
-genai.configure(api_key="AIzaSyBcfcI8WFa798JtYaPpvxR94AYPz3LiVPM    ")
+if not GEMINI_API_KEY:
+    raise Exception('FESTIFLY_GEMINI_API_KEY environment variable not set!')
+genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-2.0-flash")
-
-HEYGEN_API_KEY = "NWM0NzA2YTgxY2Q3NDgwM2JkYjIzZDBkMGYyNjk0NjgtMTc1MDkyMDY1OA=="
-
-# Connect to MongoDB
-client = MongoClient('mongodb+srv://ihub:akash@ihub.fel24ru.mongodb.net/')
-db = client['festifly']
-festival_collection = db['festivals']
 
 # You can expand this to include more search sources
 SEARCH_SOURCES = ["festivals", "events", "concerts", "cultural events"]
@@ -1854,7 +1862,7 @@ def get_tavus_video(request):
     
     # If we have a video_id, check with Tavus API for both player and download URLs
     if video_data.get("video_id"):
-        tavus_api_key = "703ba724213b46eca9a8eae6663dff22"
+        tavus_api_key = FESTIFLY_TAVUS_API_KEY
         video_id = video_data.get("video_id")
         status_url = f"https://tavusapi.com/v2/videos/{video_id}"
         headers = {"x-api-key": tavus_api_key}
@@ -1925,19 +1933,20 @@ def check_subscription_expiry(user):
             user['premium']['expired'] = True
     
     return user
-@csrf_exempt
-def ask_bot(request):
-    if request.method == "POST":
-        try:
-            data = json.loads(request.body)
-            query = data.get("query", "")
-            if not query:
-                return JsonResponse({"error": "No query provided"}, status=400)
 
-            response = fetch_dappier_data(query)
-            return JsonResponse(response)
+# @csrf_exempt
+# def ask_bot(request):
+#     if request.method == "POST":
+#         try:
+#             data = json.loads(request.body)
+#             query = data.get("query", "")
+#             if not query:
+#                 return JsonResponse({"error": "No query provided"}, status=400)
 
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
-    else:
-        return JsonResponse({"error": "Only POST method allowed"}, status=405)
+#             response = fetch_dappier_data(query)
+#             return JsonResponse(response)
+
+#         except Exception as e:
+#             return JsonResponse({"error": str(e)}, status=500)
+#     else:
+#         return JsonResponse({"error": "Only POST method allowed"}, status=405)
