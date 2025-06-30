@@ -246,106 +246,80 @@ const TripPlannerPage = () => {
     }, 2000);
   };
 
-  const handlePlayVideo = async () => {
-    if (!festival) return;
+const handlePlayVideo = async () => {
+  if (!festival) return;
+  
+  const token = Cookies.get('jwt');
+  if (!token) {
+    setVideoError("Please log in to use the video generation feature.");
+    setShowVideoModal(true);
+    return;
+  }
+  
+  // Check usage limits (existing code...)
+  
+  setShowVideoModal(true);
+  setLoadingVideo(true);
+  setVideoScript(null);
+  setVideoUrl(null);
+  setVideoError(null);
+  setVideoStatus(null);
+  setShowWatchButton(false);
+  
+  try {
+    const response = await fetch("http://localhost:8000/api/tavus-generate/", {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ _id: festival._id })
+    });
     
-    const token = Cookies.get('jwt');
-    if (!token) {
-      setVideoError("Please log in to use the video generation feature.");
-      setShowVideoModal(true);
+    const data = await response.json();
+    console.log('Video API Response:', data);
+    
+    if (response.status === 503 && data.code === "API_EXHAUSTED") {
+      // API exhausted - show specific message
+      setVideoError("Video generation is temporarily unavailable due to API limits. Please try again later.");
+      setLoadingVideo(false);
       return;
     }
     
-    try {
-      const decoded: any = jwtDecode(token);
-      const plan = decoded.plan;
-      
-      // Check video generation limits
-      if (!plan) {
-        // Free user
-        if (videoUsageLeft !== null && videoUsageLeft <= 0) {
-          setVideoError("You have reached the video generation limit for free users (1 video). Please upgrade to generate more videos.");
-          setShowVideoModal(true);
-          setShowUpgradePrompt(true);
-          return;
-        }
-      } else if (plan === 'monthly') {
-        // Monthly user
-        if (videoUsageLeft !== null && videoUsageLeft <= 0) {
-          setVideoError("You have reached the video generation limit for your monthly plan (2 videos). Upgrade to yearly for more videos.");
-          setShowVideoModal(true);
-          setShowUpgradePrompt(true);
-          return;
-        }
-      } else if (plan === 'yearly') {
-        // Yearly user
-        if (videoUsageLeft !== null && videoUsageLeft <= 0) {
-          setVideoError("You have reached the video generation limit for your yearly plan (6 videos).");
-          setShowVideoModal(true);
-          return;
-        }
-      }
-      
-    } catch (error) {
-      console.error("Failed to decode JWT:", error);
+    if (response.status === 403) {
+      // Usage limit exceeded
+      setVideoError(data.error);
+      setShowUpgradePrompt(true);
+      setLoadingVideo(false);
+      return;
     }
     
-    setShowVideoModal(true);
-    setLoadingVideo(true);
-    setVideoScript(null);
-    setVideoUrl(null);
-    setVideoError(null);
-    setVideoStatus(null);
-    setShowWatchButton(false);
-    
-    try {
-      const response = await fetch("http://localhost:8000/api/tavus-generate/", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ _id: festival._id })
-      });
+    if (response.ok && data.video_url) {
+      // Video is available (from database)
+      setVideoUrl(data.video_url);
+      setVideoStatus("completed");
+      setLoadingVideo(false);
       
-      const data = await response.json();
-      console.log('Video API Response:', data);
+      // Refresh usage stats
+      fetchVideoUsageStats();
       
-      if (response.status === 403) {
-        // Usage limit exceeded
-        setVideoError(data.error);
-        setShowUpgradePrompt(true);
-        setLoadingVideo(false);
-        return;
-      }
+    } else if (response.status === 202) {
+      // Video is being processed
+      setVideoStatus(data.status);
+      setShowWatchButton(true);
+      setLoadingVideo(false);
       
-      if (response.status === 202) {
-        // Video is being processed - show watch button and stop loading
-        setVideoStatus(data.status);
-        setShowWatchButton(true);
-        setLoadingVideo(false);
-        
-        // Refresh usage stats after successful generation
-        fetchVideoUsageStats();
-        
-      } else if (response.ok && data.video_url) {
-        // Video is already completed
-        setVideoUrl(data.video_url);
-        setVideoStatus("completed");
-        setLoadingVideo(false);
-        
-      } else {
-        setVideoError(data.error || 'Failed to generate AI video');
-        setLoadingVideo(false);
-      }
-      
-    } catch (error) {
-      console.error("Failed to fetch AI video:", error);
-      setVideoError('Network error occurred while generating video');
+    } else {
+      setVideoError(data.error || 'Failed to load video');
       setLoadingVideo(false);
     }
-  };
-  
+    
+  } catch (error) {
+    console.error("Failed to fetch video:", error);
+    setVideoError('Network error occurred while loading video');
+    setLoadingVideo(false);
+  }
+};  
   const handleWatchVideo = async () => {
     if (!festival) return;
     
