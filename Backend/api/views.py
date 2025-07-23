@@ -21,6 +21,9 @@ import random
 import jwt
 from django.conf import settings
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+load_dotenv() 
 
 # Load secrets from environment variables
 SECRET_KEY = os.environ.get('FESTIFLY_SECRET_KEY', 'FetiFly')
